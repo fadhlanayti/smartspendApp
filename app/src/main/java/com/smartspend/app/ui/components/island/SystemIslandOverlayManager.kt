@@ -51,9 +51,8 @@ object SystemIslandOverlayManager {
     private const val AUTO_COLLAPSE_TIMEOUT_MS = 10000L
     private const val ATTACH_WATCHDOG_INTERVAL_MS = 2500L
 
-    // Tuned for Infinix Note 30 Pro (Camera punch hole: X=468..612, Y=0..108px)
-    // Small top gap (8dp) gives subtle breathing room from top screen bezel
-    private const val TOP_GAP_DP = 8
+    // Positioned right below the status bar (status bar height ~36dp) so icons (wifi, clock, notifs) don't overlap
+    private const val TOP_GAP_DP = 42
     private const val CAMERA_CUTOUT_WIDTH_DP = 42
     private const val COMPACT_WIDTH_DP = 142
     private const val COMPACT_HEIGHT_DP = 38
