@@ -45,6 +45,8 @@ data class HomeUiState(
     val weekSpends: List<DaySpend> = emptyList(),
     val totalDebtOwe: Long = 0L,
     val totalDebtOwed: Long = 0L,
+    val oweDetails: List<com.smartspend.app.core.database.entity.DebtEntity> = emptyList(),
+    val owedDetails: List<com.smartspend.app.core.database.entity.DebtEntity> = emptyList(),
     val activePlansCount: Int = 0,
     val savedMoneyThisMonth: Long = 0L
 )
@@ -174,10 +176,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 val weekData = calculateWeekSpends()
 
                 // Debts
-                val owe = secondary.debts.filter { it.direction == "OWE" && it.status == "ACTIVE" && !it.isDeleted }
-                    .sumOf { it.principalAmount - it.paidAmount }
-                val owed = secondary.debts.filter { it.direction == "OWED" && it.status == "ACTIVE" && !it.isDeleted }
-                    .sumOf { it.principalAmount - it.paidAmount }
+                val activeDebts = secondary.debts.filter { it.status == "ACTIVE" && !it.isDeleted }
+                val oweList = activeDebts.filter { it.direction == "OWE" }.sortedByDescending { it.principalAmount - it.paidAmount }
+                val owedList = activeDebts.filter { it.direction == "OWED" }.sortedByDescending { it.principalAmount - it.paidAmount }
+                val owe = oweList.sumOf { it.principalAmount - it.paidAmount }
+                val owed = owedList.sumOf { it.principalAmount - it.paidAmount }
 
                 // Plans
                 val activePlans = secondary.plans.filter { it.status == "WAITING" || it.status == "READY" }
@@ -198,6 +201,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     weekSpends = weekData,
                     totalDebtOwe = owe,
                     totalDebtOwed = owed,
+                    oweDetails = oweList,
+                    owedDetails = owedList,
                     activePlansCount = activePlans.size,
                     savedMoneyThisMonth = savedMoney
                 )

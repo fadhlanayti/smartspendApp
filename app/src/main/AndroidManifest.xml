@@ -5,12 +5,16 @@
     <!-- Permissions requested according to PRD section 7.2 -->
     <!-- Notice: INTERNET for loading bank logos & update widgets -->
     <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
-    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
     <uses-permission android:name="android.permission.READ_CONTACTS" />
+    <!-- NOTE: SYSTEM_ALERT_WINDOW sengaja TIDAK diminta. Overlay island memakai
+         WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY yang tidak butuh izin
+         "draw over other apps", sehingga tidak memicu "Risky App Detected" di XOS
+         maupun Play Protect. REQUEST_IGNORE_BATTERY_OPTIMIZATIONS juga dihapus karena
+         service sudah system-bound (accessibility + notification listener) dan
+         WorkManager tetap berjalan tanpa exemption. -->
 
     <queries>
         <intent>
@@ -27,6 +31,7 @@
         android:fullBackupContent="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
+        android:networkSecurityConfig="@xml/network_security_config"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.SmartSpend"

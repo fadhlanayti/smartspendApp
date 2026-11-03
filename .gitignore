@@ -12,3 +12,9 @@ app/build/
 .kotlin/
 *.hprof
 *.log
+
+# Signing secrets — never commit
+keystore.properties
+keystore/
+*.jks
+*.keystore

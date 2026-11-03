@@ -21,7 +21,10 @@ data class WidgetSnapshot(
     val topCategoriesJson: String = "[]",
     val recentTransactionsJson: String = "[]",
     val accountBalancesJson: String = "[]",
-    val debtsDueCount: Int = 0
+    val debtsDueCount: Int = 0,
+    val totalBalance: Long = 0L,
+    val totalDebtOwe: Long = 0L,
+    val totalDebtOwed: Long = 0L
 )
 
 object WidgetStateStore {
@@ -34,6 +37,9 @@ object WidgetStateStore {
     val KEY_RECENT_TRANSACTIONS = stringPreferencesKey("recent_transactions")
     val KEY_ACCOUNT_BALANCES = stringPreferencesKey("account_balances")
     val KEY_DEBTS_DUE_COUNT = stringPreferencesKey("debts_due_count")
+    val KEY_TOTAL_BALANCE = longPreferencesKey("total_balance")
+    val KEY_TOTAL_DEBT_OWE = longPreferencesKey("total_debt_owe")
+    val KEY_TOTAL_DEBT_OWED = longPreferencesKey("total_debt_owed")
 
     fun getSnapshotFlow(context: Context): Flow<WidgetSnapshot> {
         return context.widgetDataStore.data.map { prefs ->
@@ -46,7 +52,10 @@ object WidgetStateStore {
                 topCategoriesJson = prefs[KEY_TOP_CATEGORIES] ?: "[]",
                 recentTransactionsJson = prefs[KEY_RECENT_TRANSACTIONS] ?: "[]",
                 accountBalancesJson = prefs[KEY_ACCOUNT_BALANCES] ?: "[]",
-                debtsDueCount = (prefs[KEY_DEBTS_DUE_COUNT] ?: "0").toIntOrNull() ?: 0
+                debtsDueCount = (prefs[KEY_DEBTS_DUE_COUNT] ?: "0").toIntOrNull() ?: 0,
+                totalBalance = prefs[KEY_TOTAL_BALANCE] ?: 0L,
+                totalDebtOwe = prefs[KEY_TOTAL_DEBT_OWE] ?: 0L,
+                totalDebtOwed = prefs[KEY_TOTAL_DEBT_OWED] ?: 0L
             )
         }
     }
@@ -66,6 +75,9 @@ object WidgetStateStore {
             prefs[KEY_RECENT_TRANSACTIONS] = snapshot.recentTransactionsJson
             prefs[KEY_ACCOUNT_BALANCES] = snapshot.accountBalancesJson
             prefs[KEY_DEBTS_DUE_COUNT] = snapshot.debtsDueCount.toString()
+            prefs[KEY_TOTAL_BALANCE] = snapshot.totalBalance
+            prefs[KEY_TOTAL_DEBT_OWE] = snapshot.totalDebtOwe
+            prefs[KEY_TOTAL_DEBT_OWED] = snapshot.totalDebtOwed
         }
     }
 

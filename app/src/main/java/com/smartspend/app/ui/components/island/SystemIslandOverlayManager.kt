@@ -10,10 +10,8 @@ import android.graphics.PixelFormat
 import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.net.Uri
-import android.os.Build
 import android.os.Handler
 import android.os.Looper
-import android.provider.Settings
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
@@ -63,7 +61,7 @@ object SystemIslandOverlayManager {
 
     // Compact tight expanded card: 160dp height with slim margins
     private const val EXPANDED_WIDTH_DP = 330
-    private const val EXPANDED_HEIGHT_DP = 160
+    private const val EXPANDED_HEIGHT_DP = 198
     private const val EXPANDED_CORNER_RADIUS_DP = 26
 
     private const val ALERT_WIDTH_DP = 264
@@ -83,15 +81,14 @@ object SystemIslandOverlayManager {
     private val appleSpringEnter = PathInterpolator(0.22f, 1f, 0.36f, 1f)
     private val appleSpringExit = PathInterpolator(0.3f, 0f, 0.2f, 1f)
 
-    fun canDrawOverlays(context: Context): Boolean {
-        if (SmartSpendIslandAccessibilityService.instance != null) return true
+    /**
+     * The island only ever renders through the accessibility overlay layer
+     * (TYPE_ACCESSIBILITY_OVERLAY), which needs no "draw over other apps" grant.
+     * So the only real prerequisite is that the accessibility service is connected.
+     */
+    fun isAccessibilityConnected(): Boolean = SmartSpendIslandAccessibilityService.instance != null
 
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            Settings.canDrawOverlays(context)
-        } else {
-            true
-        }
-    }
+    fun canDrawOverlays(context: Context): Boolean = isAccessibilityConnected()
 
     fun onAccessibilityServiceConnected(service: SmartSpendIslandAccessibilityService) {
         mainHandler.post {
@@ -294,19 +291,15 @@ object SystemIslandOverlayManager {
     private fun ensureOverlayCreated(context: Context) {
         if (overlayRoot != null && isAttached) return
 
-        val a11yService = SmartSpendIslandAccessibilityService.instance
-        val (wm, windowType) = if (a11yService != null) {
-            // Layer 311000: Renders ABOVE the Android status bar and notch!
-            (a11yService.getSystemService(Context.WINDOW_SERVICE) as WindowManager) to WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
-        } else {
-            // Standard overlay fallback (111000)
-            (context.applicationContext.getSystemService(Context.WINDOW_SERVICE) as WindowManager) to (
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-                    WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-                else
-                    WindowManager.LayoutParams.TYPE_PHONE
-            )
+        val a11yService = SmartSpendIslandAccessibilityService.instance ?: run {
+            // No accessibility connection -> no TYPE_ACCESSIBILITY_OVERLAY window possible.
+            // We deliberately do NOT fall back to TYPE_APPLICATION_OVERLAY because that
+            // would require SYSTEM_ALERT_WINDOW, which trips OEM "risky app" detectors.
+            return
         }
+        // Layer 311000: Renders ABOVE the Android status bar and notch.
+        val wm = a11yService.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        val windowType = WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
         activeWindowManager = wm
 
         cardBackground = GradientDrawable().apply {
@@ -773,6 +766,27 @@ object SystemIslandOverlayManager {
             statsRow.addView(rightCol)
             addView(statsRow)
 
+            // --- Wealth Row: Total Saldo | Utang | Piutang ---
+            val wealthRow = LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { bottomMargin = dpToPx(context, 10) }
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.RECTANGLE
+                    cornerRadius = dpToPx(context, 10).toFloat()
+                    setColor(Color.parseColor("#16181F"))
+                    setStroke(dpToPx(context, 1), Color.parseColor("#242835"))
+                }
+                setPadding(dpToPx(context, 8), dpToPx(context, 6), dpToPx(context, 8), dpToPx(context, 6))
+            }
+
+            wealthRow.addView(wealthCell(context, "Saldo", snapshot.totalBalance, "#FFFFFF"))
+            wealthRow.addView(wealthCell(context, "Utang", -snapshot.totalDebtOwe, "#FF4757"))
+            wealthRow.addView(wealthCell(context, "Piutang", snapshot.totalDebtOwed, "#10D876"))
+            addView(wealthRow)
+
             // --- Buttons Row: [+ Catat] [Riwayat] ---
             val btnRow = LinearLayout(context).apply {
                 orientation = LinearLayout.HORIZONTAL
@@ -823,6 +837,31 @@ object SystemIslandOverlayManager {
             }
             btnRow.addView(riwayatBtn)
             addView(btnRow)
+        }
+    }
+
+    /** One third of the island wealth strip: label + short amount. */
+    private fun wealthCell(context: Context, label: String, amount: Long, colorHex: String): View {
+        return LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            gravity = Gravity.CENTER
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
+
+            val lbl = TextView(context).apply {
+                text = label
+                setTextColor(Color.parseColor("#8F96A8"))
+                textSize = 9.5f
+            }
+            addView(lbl)
+
+            val amt = TextView(context).apply {
+                text = CurrencyFormatter.formatShort(amount)
+                setTextColor(Color.parseColor(colorHex))
+                textSize = 11f
+                typeface = Typeface.DEFAULT_BOLD
+                maxLines = 1
+            }
+            addView(amt)
         }
     }
 

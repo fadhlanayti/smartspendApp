@@ -173,6 +173,60 @@ fun SettingsScreen(
                 }
             }
 
+            // Section 1b: Dynamic Island access (accessibility-based, no overlay permission)
+            item {
+                SquircleCard {
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Dynamic Island di Layar Utama",
+                                style = MaterialTheme.typography.bodyLarge,
+                                fontWeight = FontWeight.SemiBold
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = if (uiState.isIslandActive) {
+                                    "Aktif • Muncul otomatis di homescreen"
+                                } else {
+                                    "Belum Diizinkan • Butuh izin Layanan Aksesibilitas"
+                                },
+                                style = MaterialTheme.typography.bodySmall,
+                                color = if (uiState.isIslandActive) ColorIncomeDark else ColorWarning
+                            )
+                        }
+
+                        Button(
+                            onClick = {
+                                context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                            },
+                            shape = RoundedCornerShape(12.dp),
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (uiState.isIslandActive) MaterialTheme.colorScheme.surfaceVariant else AccentBlue
+                            )
+                        ) {
+                            Text(
+                                text = if (uiState.isIslandActive) "Cek" else "Aktifkan",
+                                color = if (uiState.isIslandActive) MaterialTheme.colorScheme.onSurfaceVariant else Color.White
+                            )
+                        }
+                    }
+
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        text = "SmartSpend memakai Layanan Aksesibilitas hanya untuk menggambar " +
+                            "kartu ringkasan di atas layar utama. Aplikasi TIDAK membaca isi layar, " +
+                            "tidak mengumpulkan data, dan tidak memakai izin \u201cmenampilkan di atas " +
+                            "aplikasi lain\u201d. Seluruh data transaksi tetap tersimpan lokal di HP kamu.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+            }
+
             // Section 2: Budget & Master Accounts
             item {
                 Text(

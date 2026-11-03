@@ -121,15 +121,30 @@ fun SmartSpendApp(
     var openBudgetOnSettings by remember { mutableStateOf(false) }
     var showFeatures by remember { mutableStateOf(false) }
 
-    // Request runtime POST_NOTIFICATIONS permission on Android 13+ (API 33+)
+    // Request runtime permissions on Android 13+ (API 33+)
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+        val permissionLauncher = rememberLauncherForActivityResult(
+            contract = ActivityResultContracts.RequestMultiplePermissions()
+        ) { _ -> }
+
+        LaunchedEffect(Unit) {
+            val needed = mutableListOf<String>()
+            if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                needed.add(Manifest.permission.POST_NOTIFICATIONS)
+            }
+            if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
+                needed.add(Manifest.permission.READ_CONTACTS)
+            }
+            if (needed.isNotEmpty()) permissionLauncher.launch(needed.toTypedArray())
+        }
+    } else {
         val permissionLauncher = rememberLauncherForActivityResult(
             contract = ActivityResultContracts.RequestPermission()
         ) { _ -> }
 
         LaunchedEffect(Unit) {
-            if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
-                permissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            if (ContextCompat.checkSelfPermission(context, Manifest.permission.READ_CONTACTS) != PackageManager.PERMISSION_GRANTED) {
+                permissionLauncher.launch(Manifest.permission.READ_CONTACTS)
             }
         }
     }

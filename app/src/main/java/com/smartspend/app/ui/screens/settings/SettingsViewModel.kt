@@ -22,6 +22,7 @@ import java.util.Locale
 
 data class SettingsUiState(
     val isListenerActive: Boolean = false,
+    val isIslandActive: Boolean = false,
     val isDevModeEnabled: Boolean = false,
     val monthlyBudgetLimit: Long = 3_000_000L,
     val alertThresholdPct: Int = 80,
@@ -70,6 +71,12 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         val enabledListeners = Settings.Secure.getString(app.contentResolver, "enabled_notification_listeners")
         val isListenerActive = enabledListeners?.contains(app.packageName) == true
 
+        // The island renders through TYPE_ACCESSIBILITY_OVERLAY, so the user-visible
+        // prerequisite is this app's accessibility service being enabled.
+        val enabledA11y = Settings.Secure.getString(app.contentResolver, "enabled_accessibility_services")
+        val a11yFlag = Settings.Secure.getInt(app.contentResolver, "accessibility_enabled", 0) == 1
+        val isIslandActive = a11yFlag && enabledA11y?.contains(app.packageName) == true
+
         viewModelScope.launch {
             combine(
                 db.accountDao().getAllAccountsFlow(),
@@ -84,6 +91,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
 
                 _uiState.value.copy(
                     isListenerActive = isListenerActive,
+                    isIslandActive = isIslandActive,
                     accounts = accounts,
                     categories = categories,
                     rules = rules,

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  SmartSpend only talks to the internet to fetch bank / e-wallet brand logos over
+  HTTPS. Cleartext stays disabled so the app can never be flagged for plaintext
+  traffic. Certificate pinning is intentionally not used because the logo hosts
+  are third-party CDNs (raw.githubusercontent.com) whose certificate chain can
+  rotate without notice; the images are non-sensitive and are cached locally.
+-->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="false">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

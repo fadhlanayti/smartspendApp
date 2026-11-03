@@ -4,6 +4,7 @@ import android.content.Context
 import androidx.glance.appwidget.updateAll
 import com.smartspend.app.core.database.SmartSpendDatabase
 import kotlinx.coroutines.*
+import kotlinx.coroutines.flow.first
 import org.json.JSONArray
 import org.json.JSONObject
 import java.text.SimpleDateFormat
@@ -73,6 +74,15 @@ object WidgetUpdater {
         val remainingBudget = maxOf(0L, monthLimit - monthTotal)
         val remainingDaily = remainingBudget / remainingDays
 
+        // Total saldo semua akun aktif (yang tidak diarsipkan)
+        val activeAccounts = accountDao.getActiveAccountsFlow().first()
+        val totalBalance = activeAccounts.sumOf { it.currentBalance }
+
+        // Utang & piutang aktif
+        val activeDebts = db.debtDao().getAllDebtsFlow().first().filter { it.status == "ACTIVE" && !it.isDeleted }
+        val totalDebtOwe = activeDebts.filter { it.direction == "OWE" }.sumOf { it.principalAmount - it.paidAmount }
+        val totalDebtOwed = activeDebts.filter { it.direction == "OWED" }.sumOf { it.principalAmount - it.paidAmount }
+
         // Top 3 categories
         val categoryTotals = monthExpenses.groupBy { it.categoryId ?: 0L }
             .mapValues { entry -> entry.value.sumOf { it.amount + it.fee } }
@@ -111,7 +121,10 @@ object WidgetUpdater {
             monthExpense = monthTotal,
             monthBudgetLimit = monthLimit,
             topCategoriesJson = catArray.toString(),
-            recentTransactionsJson = txArray.toString()
+            recentTransactionsJson = txArray.toString(),
+            totalBalance = totalBalance,
+            totalDebtOwe = totalDebtOwe,
+            totalDebtOwed = totalDebtOwed
         )
 
         WidgetStateStore.updateSnapshot(context, newSnapshot)

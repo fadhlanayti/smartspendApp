@@ -158,6 +158,19 @@ fun HomeScreen(
                 LiveClockWeatherCard()
             }
 
+            // 0b. Ringkasan Kekayaan: Total Saldo | Utang | Piutang
+            item {
+                WealthSummaryCard(
+                    accounts = uiState.accounts,
+                    totalDebtOwe = uiState.totalDebtOwe,
+                    totalDebtOwed = uiState.totalDebtOwed,
+                    oweDetails = uiState.oweDetails,
+                    owedDetails = uiState.owedDetails,
+                    isHideBalance = uiState.isHideBalance,
+                    onDebtsClick = onNavigateToDebts
+                )
+            }
+
             // 1. Net Cashflow Card
             item {
                 NetCashflowCard(
@@ -531,6 +544,257 @@ fun AccountCard(
                 color = MaterialTheme.colorScheme.onSurface
             )
         }
+    }
+}
+
+@Composable
+fun WealthSummaryCard(
+    accounts: List<AccountEntity>,
+    totalDebtOwe: Long,
+    totalDebtOwed: Long,
+    oweDetails: List<com.smartspend.app.core.database.entity.DebtEntity>,
+    owedDetails: List<com.smartspend.app.core.database.entity.DebtEntity>,
+    isHideBalance: Boolean,
+    onDebtsClick: () -> Unit = {},
+    modifier: Modifier = Modifier
+) {
+    var showDebtDetail by remember { mutableStateOf(false) }
+
+    val totalBalance = accounts.sumOf { it.currentBalance }
+    val netWorth = totalBalance + totalDebtOwed - totalDebtOwe
+    val bankCount = accounts.count { it.type == "BANK" }
+    val walletCount = accounts.count { it.type == "EWALLET" }
+
+    SquircleCard(modifier = modifier, backgroundColor = Color(0xFF101216), borderColor = DarkBorder) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column {
+                Text(
+                    text = "Total Saldo",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = CurrencyFormatter.format(totalBalance, isHideBalance),
+                    style = MaterialTheme.typography.displayLarge.copy(fontSize = 32.sp, letterSpacing = (-0.5).sp),
+                    fontWeight = FontWeight.ExtraBold,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+                Spacer(modifier = Modifier.height(3.dp))
+                Text(
+                    text = "$bankCount rekening bank • $walletCount e-wallet",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    text = "Kekayaan Bersih",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    fontSize = 10.sp
+                )
+                Spacer(modifier = Modifier.height(4.dp))
+                Text(
+                    text = CurrencyFormatter.format(netWorth, isHideBalance),
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = if (netWorth >= 0) ColorIncomeDark else ColorExpenseDark
+                )
+            }
+        }
+
+        Spacer(modifier = Modifier.height(14.dp))
+        HorizontalDivider(color = DarkBorder, thickness = 0.8.dp)
+        Spacer(modifier = Modifier.height(12.dp))
+
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            DebtTile(
+                label = "Utang Saya",
+                subtitle = "${oweDetails.size} orang",
+                amount = totalDebtOwe,
+                accent = ColorExpenseDark,
+                icon = Icons.Default.CallMade,
+                isHideBalance = isHideBalance,
+                modifier = Modifier.weight(1f)
+            )
+            DebtTile(
+                label = "Piutang Saya",
+                subtitle = "${owedDetails.size} orang",
+                amount = totalDebtOwed,
+                accent = ColorIncomeDark,
+                icon = Icons.Default.CallReceived,
+                isHideBalance = isHideBalance,
+                modifier = Modifier.weight(1f)
+            )
+        }
+
+        if (oweDetails.isNotEmpty() || owedDetails.isNotEmpty()) {
+            Spacer(modifier = Modifier.height(12.dp))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable { showDebtDetail = !showDebtDetail }
+                    .padding(vertical = 6.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = if (showDebtDetail) "Sembunyikan rincian" else "Lihat utang ke siapa",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.SemiBold,
+                    color = AccentBlue
+                )
+                Icon(
+                    imageVector = if (showDebtDetail) Icons.Default.ExpandLess else Icons.Default.ExpandMore,
+                    contentDescription = null,
+                    tint = AccentBlue,
+                    modifier = Modifier.size(18.dp)
+                )
+            }
+
+            if (showDebtDetail) {
+                Spacer(modifier = Modifier.height(6.dp))
+                if (oweDetails.isNotEmpty()) {
+                    Text(
+                        text = "Kamu berutang ke:",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = ColorExpenseDark
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    oweDetails.take(5).forEach { d ->
+                        DebtDetailRow(debt = d, accent = ColorExpenseDark, isHideBalance = isHideBalance)
+                    }
+                }
+                if (owedDetails.isNotEmpty()) {
+                    if (oweDetails.isNotEmpty()) Spacer(modifier = Modifier.height(10.dp))
+                    Text(
+                        text = "Orang berutang ke kamu:",
+                        style = MaterialTheme.typography.labelSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = ColorIncomeDark
+                    )
+                    Spacer(modifier = Modifier.height(6.dp))
+                    owedDetails.take(5).forEach { d ->
+                        DebtDetailRow(debt = d, accent = ColorIncomeDark, isHideBalance = isHideBalance)
+                    }
+                }
+                Spacer(modifier = Modifier.height(10.dp))
+                TextButton(onClick = onDebtsClick, modifier = Modifier.fillMaxWidth()) {
+                    Text("Kelola Utang-Piutang", fontWeight = FontWeight.Bold)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun DebtTile(
+    label: String,
+    subtitle: String,
+    amount: Long,
+    accent: Color,
+    icon: androidx.compose.ui.graphics.vector.ImageVector,
+    isHideBalance: Boolean,
+    modifier: Modifier = Modifier
+) {
+    Column(
+        modifier = modifier
+            .clip(RoundedCornerShape(14.dp))
+            .background(accent.copy(alpha = 0.10f))
+            .padding(horizontal = 12.dp, vertical = 10.dp)
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Icon(imageVector = icon, contentDescription = null, tint = accent, modifier = Modifier.size(14.dp))
+            Spacer(modifier = Modifier.width(5.dp))
+            Text(
+                text = label,
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontSize = 10.5.sp
+            )
+        }
+        Spacer(modifier = Modifier.height(5.dp))
+        Text(
+            text = CurrencyFormatter.format(amount, isHideBalance),
+            style = MaterialTheme.typography.labelMedium,
+            fontWeight = FontWeight.Bold,
+            color = accent,
+            maxLines = 1,
+            overflow = TextOverflow.Ellipsis
+        )
+        Text(
+            text = subtitle,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            fontSize = 9.5.sp
+        )
+    }
+}
+
+@Composable
+private fun DebtDetailRow(
+    debt: com.smartspend.app.core.database.entity.DebtEntity,
+    accent: Color,
+    isHideBalance: Boolean
+) {
+    val remaining = debt.principalAmount - debt.paidAmount
+    val dueStr = debt.dueDate?.let {
+        SimpleDateFormat("d MMM yy", Locale("id", "ID")).format(Date(it))
+    }
+
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(vertical = 3.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.weight(1f)) {
+            Box(
+                modifier = Modifier
+                    .size(26.dp)
+                    .clip(CircleShape)
+                    .background(accent.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center
+            ) {
+                Text(
+                    text = debt.counterpartyName.trim().take(1).uppercase().ifBlank { "?" },
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Bold,
+                    color = accent
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Column {
+                Text(
+                    text = debt.counterpartyName,
+                    style = MaterialTheme.typography.labelSmall,
+                    fontWeight = FontWeight.Medium,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+                Text(
+                    text = dueStr?.let { "Jatuh tempo $it" } ?: "Tanpa jatuh tempo",
+                    style = MaterialTheme.typography.labelSmall,
+                    fontSize = 9.5.sp,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        }
+        Text(
+            text = CurrencyFormatter.format(remaining, isHideBalance),
+            style = MaterialTheme.typography.labelSmall,
+            fontWeight = FontWeight.Bold,
+            color = accent,
+            maxLines = 1
+        )
     }
 }
 
