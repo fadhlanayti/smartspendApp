@@ -2,6 +2,4 @@
     <string name="app_name">SmartSpend</string>
     <string name="notification_listener_label">SmartSpend Pembaca Notifikasi Transaksi</string>
     <string name="widget_description">Lihat sisa budget dan pengeluaran harian SmartSpend secara sekilas.</string>
-    <string name="accessibility_service_label">SmartSpend Dynamic Island</string>
-    <string name="accessibility_service_desc">SmartSpend memakai layanan ini HANYA untuk menggambar kartu ringkasan (Dynamic Island) di atas layar utama, sehingga kamu bisa melihat sisa anggaran harian tanpa membuka aplikasi.\n\nLayanan ini TIDAK membaca isi layar, TIDAK merekam ketikan, TIDAK mengakses kata sandi, dan TIDAK mengirim data ke mana pun. Semua data transaksi disimpan lokal di perangkat kamu.</string>
 </resources>

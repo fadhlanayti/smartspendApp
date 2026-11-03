@@ -9,12 +9,7 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
     <uses-permission android:name="android.permission.READ_CONTACTS" />
-    <!-- NOTE: SYSTEM_ALERT_WINDOW sengaja TIDAK diminta. Overlay island memakai
-         WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY yang tidak butuh izin
-         "draw over other apps", sehingga tidak memicu "Risky App Detected" di XOS
-         maupun Play Protect. REQUEST_IGNORE_BATTERY_OPTIMIZATIONS juga dihapus karena
-         service sudah system-bound (accessibility + notification listener) dan
-         WorkManager tetap berjalan tanpa exemption. -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <queries>
         <intent>
@@ -68,19 +63,6 @@
             </intent-filter>
         </service>
 
-        <!-- Dynamic Island High-Layer Overlay Service (draws above status bar) -->
-        <service
-            android:name=".service.SmartSpendIslandAccessibilityService"
-            android:exported="true"
-            android:label="@string/accessibility_service_label"
-            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
-            <intent-filter>
-                <action android:name="android.accessibilityservice.AccessibilityService" />
-            </intent-filter>
-            <meta-data
-                android:name="android.accessibilityservice"
-                android:resource="@xml/accessibility_service_config" />
-        </service>
 
         <!-- Boot Receiver for rescheduling watchdog, rebind, reminders -->
         <receiver

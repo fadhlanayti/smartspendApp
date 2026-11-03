@@ -57,6 +57,35 @@ Sudah dilengkapi kartu dan identitas visual resmi untuk berbagai bank dan e-wall
 - Saat mencatat transfer atau pemasukan, kamu bisa memilih nama penerima dari daftar kontak HP dengan satu ketukan — tidak perlu mengetik ulang.
 - Berguna juga untuk mengingatkan orang yang berutang lewat WhatsApp langsung dari daftar utang-piutang.
 
+### 💰 8. Ringkasan Kekayaan di Halaman Utama
+- **Total Saldo**: Jumlah seluruh uangmu di semua rekening bank, e-wallet, dan uang tunai dalam satu angka.
+- **Utang Saya**: Total uang yang harus kamu bayar, plus jumlah orang yang kamu utangi.
+- **Piutang Saya**: Total uang yang harus dibayar orang lain ke kamu.
+- **Utangnya ke Siapa**: Ketuk "Lihat utang ke siapa" untuk membuka rincian per orang — nama, sisa utang, dan tanggal jatuh tempo.
+- **Kekayaan Bersih**: Total saldo ditambah piutang dikurangi utang, jadi kamu tahu posisi keuanganmu sebenarnya.
+
+---
+
+## 🔐 Izin Aplikasi & Kenapa Aman
+
+SmartSpend memakai izin seminimal mungkin. Kalau HP-mu pernah menampilkan peringatan "aplikasi berisiko", biasanya penyebabnya ada di daftar ini — dan semuanya bisa kamu periksa sendiri:
+
+| Izin | Dipakai untuk | Catatan |
+|---|---|---|
+| **Akses Notifikasi** | Membaca notifikasi transaksi bank/e-wallet untuk dicatat otomatis | Diproses lokal di HP, tidak dikirim ke server |
+| **Layanan Aksesibilitas** | Menampilkan Dynamic Island di layar utama | Hanya menggambar kartu ringkasan; **tidak** membaca isi layar, tidak merekam ketikan, tidak mengakses kata sandi |
+| **Kontak** | Memilih nama penerima transfer dari daftar kontak | Dibaca hanya saat kamu menekan tombol "pilih kontak" |
+| **Internet** | Mengunduh logo resmi bank/e-wallet | Hanya HTTPS, hanya gambar; data transaksi tidak pernah dikirim |
+| **Notifikasi** | Mengirim pengingat anggaran & jatuh tempo utang | — |
+
+**Yang TIDAK diminta SmartSpend:**
+- ❌ Izin "Menampilkan di atas aplikasi lain" (Draw over other apps) — Dynamic Island memakai lapisan aksesibilitas, jadi izin ini tidak diperlukan sama sekali.
+- ❌ Izin "Abaikan optimasi baterai" — SmartSpend tetap berjalan lewat notifikasi dan aksesibilitas.
+- ❌ Izin lokasi, kamera, mikrofon, SMS, atau telepon.
+- ❌ Akses akun perbankan, PIN, atau password.
+
+👉 **Catatan penting**: kalau HP-mu menampilkan peringatan berisiko saat memasang APK, pastikan yang kamu pasang adalah **APK rilis** (`app-release.apk`) yang sudah ditandatangani, **bukan** `app-debug.apk`. APK debug punya penanda `debuggable` yang memang sering ditandai oleh aplikasi keamanan bawaan HP (XOS/Transsion, MIUI, ColorOS, dsb.).
+
 ---
 
 ## 🚀 Cara Menjalankan Aplikasi
@@ -67,11 +96,21 @@ Sudah dilengkapi kartu dan identitas visual resmi untuk berbagai bank dan e-wall
    ```
 2. Buka folder proyek di **Android Studio**.
 3. Hubungkan perangkat Android (Android 8.0 ke atas) atau emulator.
-4. Klik **Run** atau jalankan perintah:
+4. Jalankan versi debug untuk pengembangan:
    ```bash
    ./gradlew assembleDebug
    ```
+   Atau buat APK rilis yang sudah ditandatangani (direkomendasikan untuk dipasang di HP sehari-hari):
+   ```bash
+   ./gradlew assembleRelease
+   ```
+   Salin `keystore.properties.example` menjadi `keystore.properties`, lalu isi lokasi keystore dan sandinya. Buat keystore baru kalau belum ada:
+   ```bash
+   keytool -genkeypair -v -keystore keystore/smartspend-release.jks \
+     -alias smartspend -keyalg RSA -keysize 4096 -validity 10000
+   ```
 5. Berikan izin **Akses Notifikasi** dan **Layanan Aksesibilitas** saat pertama kali membuka aplikasi agar fitur otomatisasi dapat bekerja.
+   - Android 13 ke atas: izin **Notifikasi** dan **Kontak** akan muncul otomatis setelah aplikasi dibuka.
 
 ---
 

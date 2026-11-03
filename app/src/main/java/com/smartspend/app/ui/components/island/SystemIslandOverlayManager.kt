@@ -12,6 +12,7 @@ import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Handler
 import android.os.Looper
+import android.provider.Settings
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
@@ -23,7 +24,6 @@ import android.widget.TextView
 import com.smartspend.app.MainActivity
 import com.smartspend.app.core.widget.WidgetSnapshot
 import com.smartspend.app.core.widget.WidgetStateStore
-import com.smartspend.app.service.SmartSpendIslandAccessibilityService
 import com.smartspend.app.ui.components.CurrencyFormatter
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.first
@@ -82,35 +82,10 @@ object SystemIslandOverlayManager {
     private val appleSpringExit = PathInterpolator(0.3f, 0f, 0.2f, 1f)
 
     /**
-     * The island only ever renders through the accessibility overlay layer
-     * (TYPE_ACCESSIBILITY_OVERLAY), which needs no "draw over other apps" grant.
-     * So the only real prerequisite is that the accessibility service is connected.
+     * Checks if standard SYSTEM_ALERT_WINDOW (Display over other apps) permission is granted.
+     * Unlike AccessibilityService, this does NOT trigger banking security warnings.
      */
-    fun isAccessibilityConnected(): Boolean = SmartSpendIslandAccessibilityService.instance != null
-
-    fun canDrawOverlays(context: Context): Boolean = isAccessibilityConnected()
-
-    fun onAccessibilityServiceConnected(service: SmartSpendIslandAccessibilityService) {
-        mainHandler.post {
-            if (isAppForeground) return@post
-            // A11y service restart (OEM kill, permission re-grant) wipes our reference
-            // but not the user's intent: re-derive visibility from the current screen.
-            val shouldShow = service.isCurrentlyOnHomeScreen()
-            if (shouldShow || isVisibleState) setIslandVisible(service, shouldShow)
-        }
-    }
-
-    fun onAccessibilityServiceDisconnected() {
-        mainHandler.post {
-            stopAttachWatchdog()
-            autoCollapseRunnable?.let { mainHandler.removeCallbacks(it) }
-            dismissAlertRunnable?.let { mainHandler.removeCallbacks(it) }
-            overlayRoot = null
-            islandCard = null
-            activeWindowManager = null
-            isAttached = false
-        }
-    }
+    fun canDrawOverlays(context: Context): Boolean = Settings.canDrawOverlays(context)
 
     fun onAppForeground(context: Context) {
         isAppForeground = true
@@ -120,11 +95,8 @@ object SystemIslandOverlayManager {
     fun onAppBackground(context: Context) {
         isAppForeground = false
         mainHandler.postDelayed({
-            if (!isAppForeground) {
-                val a11y = SmartSpendIslandAccessibilityService.instance
-                if (a11y != null && a11y.isCurrentlyOnHomeScreen()) {
-                    setIslandVisible(a11y, true)
-                }
+            if (!isAppForeground && canDrawOverlays(context)) {
+                setIslandVisible(context, true)
             }
         }, 150L)
     }
@@ -176,7 +148,7 @@ object SystemIslandOverlayManager {
                     isAttached = false
                     overlayRoot = null
                     activeWindowManager = null
-                    if (SmartSpendIslandAccessibilityService.instance != null) {
+                    if (canDrawOverlays(appContext)) {
                         ensureOverlayCreated(appContext)
                         if (isAttached) {
                             overlayRoot?.visibility = View.VISIBLE
@@ -203,7 +175,7 @@ object SystemIslandOverlayManager {
         if (attempt >= 5) return
         mainHandler.postDelayed({
             if (isAppForeground || !isVisibleState || isAttached) return@postDelayed
-            if (SmartSpendIslandAccessibilityService.instance == null) return@postDelayed
+            if (!canDrawOverlays(context)) return@postDelayed
             ensureOverlayCreated(context)
             if (isAttached) {
                 overlayRoot?.visibility = View.VISIBLE
@@ -291,15 +263,12 @@ object SystemIslandOverlayManager {
     private fun ensureOverlayCreated(context: Context) {
         if (overlayRoot != null && isAttached) return
 
-        val a11yService = SmartSpendIslandAccessibilityService.instance ?: run {
-            // No accessibility connection -> no TYPE_ACCESSIBILITY_OVERLAY window possible.
-            // We deliberately do NOT fall back to TYPE_APPLICATION_OVERLAY because that
-            // would require SYSTEM_ALERT_WINDOW, which trips OEM "risky app" detectors.
+        if (!canDrawOverlays(context)) {
             return
         }
-        // Layer 311000: Renders ABOVE the Android status bar and notch.
-        val wm = a11yService.getSystemService(Context.WINDOW_SERVICE) as WindowManager
-        val windowType = WindowManager.LayoutParams.TYPE_ACCESSIBILITY_OVERLAY
+        val appContext = context.applicationContext
+        val wm = appContext.getSystemService(Context.WINDOW_SERVICE) as WindowManager
+        val windowType = WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
         activeWindowManager = wm
 
         cardBackground = GradientDrawable().apply {
@@ -378,6 +347,9 @@ object SystemIslandOverlayManager {
         ).apply {
             gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
             y = dpToPx(context, TOP_GAP_DP)
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
+                layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
+            }
         }
 
         try {

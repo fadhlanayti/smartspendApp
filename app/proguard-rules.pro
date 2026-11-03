@@ -20,7 +20,6 @@
 -keep class com.smartspend.app.core.widget.SmartSpendGlanceWidget { *; }
 
 # ---- Services / receivers referenced from the manifest ----
--keep class com.smartspend.app.service.SmartSpendIslandAccessibilityService { *; }
 -keep class com.smartspend.app.service.SpendNotificationListener { *; }
 -keep class com.smartspend.app.service.BootReceiver { *; }
 -keep class com.smartspend.app.service.ReminderSweepWorker { *; }
@@ -28,7 +27,6 @@
 -keep class com.smartspend.app.SmartSpendApplication { *; }
 
 # ---- AccessibilityService entry points are invoked by the framework ----
--keep class * extends android.accessibilityservice.AccessibilityService { *; }
 -keep class * extends android.service.notification.NotificationListenerService { *; }
 -keep class * extends android.content.BroadcastReceiver { *; }
 -keep class * extends androidx.work.Worker { *; }

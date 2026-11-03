@@ -190,9 +190,9 @@ fun SettingsScreen(
                             Spacer(modifier = Modifier.height(2.dp))
                             Text(
                                 text = if (uiState.isIslandActive) {
-                                    "Aktif • Muncul otomatis di homescreen"
+                                    "Aktif • Tampil di atas layar utama"
                                 } else {
-                                    "Belum Diizinkan • Butuh izin Layanan Aksesibilitas"
+                                    "Belum Diizinkan • Butuh izin Tampilkan di atas aplikasi lain"
                                 },
                                 style = MaterialTheme.typography.bodySmall,
                                 color = if (uiState.isIslandActive) ColorIncomeDark else ColorWarning
@@ -201,7 +201,11 @@ fun SettingsScreen(
 
                         Button(
                             onClick = {
-                                context.startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
+                                val intent = Intent(
+                                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                    Uri.parse("package:${context.packageName}")
+                                )
+                                context.startActivity(intent)
                             },
                             shape = RoundedCornerShape(12.dp),
                             colors = ButtonDefaults.buttonColors(
@@ -217,10 +221,10 @@ fun SettingsScreen(
 
                     Spacer(modifier = Modifier.height(8.dp))
                     Text(
-                        text = "SmartSpend memakai Layanan Aksesibilitas hanya untuk menggambar " +
-                            "kartu ringkasan di atas layar utama. Aplikasi TIDAK membaca isi layar, " +
-                            "tidak mengumpulkan data, dan tidak memakai izin \u201cmenampilkan di atas " +
-                            "aplikasi lain\u201d. Seluruh data transaksi tetap tersimpan lokal di HP kamu.",
+                        text = "SmartSpend memakai izin standar \u201cTampilkan di atas aplikasi lain\u201d " +
+                            "untuk menggambar kartu ringkasan pintar (Dynamic Island) di layar depan. " +
+                            "SmartSpend TIDAK memakai izin Aksesibilitas sehingga aman dan tidak memicu " +
+                            "peringatan risiko di aplikasi perbankan (SeaBank, dsb). Seluruh data transaksi tetap aman & lokal.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
