@@ -180,6 +180,15 @@ interface NotificationRuleDao {
     @Query("DELETE FROM notification_rules WHERE id = :id AND is_builtin = 0")
     suspend fun deleteCustomRule(id: Long)
 
+    @Query("DELETE FROM notification_rules WHERE id = :id")
+    suspend fun deleteRule(id: Long)
+
+    @Query("DELETE FROM notification_rules")
+    suspend fun deleteAllRules()
+
+    @Query("UPDATE notification_rules SET is_enabled = :enabled")
+    suspend fun setAllRulesEnabled(enabled: Boolean)
+
     @Query("SELECT * FROM notification_rules")
     suspend fun getAllRulesList(): List<NotificationRuleEntity>
 }

@@ -21,6 +21,31 @@ import kotlinx.coroutines.launch
 
 class SpendNotificationListener : NotificationListenerService() {
 
+    companion object {
+        private val KNOWN_FINANCIAL_PACKAGES = setOf(
+            "com.bca",
+            "com.bca.mybca.omni.android",
+            "com.bcadigital.blu",
+            "id.bmri.livin",
+            "id.co.bri.brimo",
+            "src.mwallet.bni.co.id",
+            "id.bni.wondr",
+            "id.co.bankbkemobile.digitalbank",
+            "com.bankjago.digitalbanking",
+            "com.jago.digitalBanking",
+            "com.btpn.jenius",
+            "id.dana",
+            "com.gojek.app",
+            "com.gojek.gopay",
+            "com.gojek.gopaymerchant",
+            "com.shopee.id",
+            "com.shopeepay.id",
+            "check.ovo.id",
+            "com.telkom.linkaja",
+            "com.aladin.bank"
+        )
+    }
+
     private val serviceScope = CoroutineScope(Dispatchers.IO + SupervisorJob())
     private lateinit var database: SmartSpendDatabase
     private lateinit var parserEngine: ParserEngine
@@ -37,6 +62,11 @@ class SpendNotificationListener : NotificationListenerService() {
         transactionRepository = TransactionRepository(this, database)
     }
 
+    override fun onListenerConnected() {
+        super.onListenerConnected()
+        android.util.Log.i("SpendNotifListener", "SpendNotificationListener connected and active")
+    }
+
     override fun onNotificationPosted(sbn: StatusBarNotification?) {
         if (sbn == null) return
 
@@ -46,7 +76,17 @@ class SpendNotificationListener : NotificationListenerService() {
         val extras = sbn.notification.extras ?: return
         val title = extras.getCharSequence("android.title")?.toString()
         val text = extras.getCharSequence("android.text")?.toString()
-        val bigText = extras.getCharSequence("android.bigText")?.toString() ?: text
+        val bigText = extras.getCharSequence("android.bigText")?.toString()
+        val subText = extras.getCharSequence("android.subText")?.toString()
+        val textLines = (extras.get("android.textLines") as? Array<*>)
+            ?.mapNotNull { it?.toString() }
+            ?.joinToString(" ")
+
+        val combinedText = listOfNotNull(bigText, text, textLines, subText)
+            .filter { it.isNotBlank() }
+            .distinct()
+            .joinToString(" ")
+            .ifBlank { text ?: "" }
 
         val notifPackage = sbn.packageName
         val postTime = sbn.postTime
@@ -57,7 +97,7 @@ class SpendNotificationListener : NotificationListenerService() {
         }
 
         serviceScope.launch {
-            processNotification(notifPackage, title, bigText, postTime)
+            processNotification(notifPackage, title, combinedText, postTime)
         }
     }
 
@@ -70,24 +110,28 @@ class SpendNotificationListener : NotificationListenerService() {
         // Ignored internal packages to prevent loop
         if (pkg == packageName) return
 
-        // Check rules
+        // 1. Check specific rules enabled for this package
         val rules = database.notificationRuleDao().getEnabledRulesForPackage(pkg)
 
-        // Record raw event for developer debugging & transparency (PRD section 2.1 & 3.6)
+        // 2. Check if this is a known financial package or registered account
+        val isKnownFintech = pkg in KNOWN_FINANCIAL_PACKAGES ||
+            database.accountDao().findAccountByPackageAndHint(pkg, null) != null
+
+        // 3. Record raw event for developer debugging & transparency (PRD section 2.1 & 3.6)
         val rawEventId = database.rawEventDao().insert(
             RawEventEntity(
                 packageName = pkg,
                 title = title,
                 text = text,
                 postTime = postTime,
-                status = if (rules.isEmpty()) "NO_RULE" else "PENDING"
+                status = if (rules.isEmpty() && !isKnownFintech) "NO_RULE" else "PENDING"
             )
         )
 
-        // If no matching rule for this package, stop processing
-        if (rules.isEmpty()) return
+        // If no matching rule AND not a known fintech app, ignore notification
+        if (rules.isEmpty() && !isKnownFintech) return
 
-        // Run regex parser
+        // 4. Run regex parser (tries package rules first, then fallback generic if rules don't match or are empty)
         val parsed = parserEngine.parse(pkg, title, text, rules)
         if (parsed == null) {
             database.rawEventDao().updateStatus(rawEventId, "FAILED")

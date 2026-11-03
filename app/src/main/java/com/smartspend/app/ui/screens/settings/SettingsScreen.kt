@@ -1776,6 +1776,9 @@ fun RuleListSheet(
     onAddRuleClick: () -> Unit
 ) {
     val uiState by viewModel.uiState.collectAsState()
+    var ruleToDelete by remember { mutableStateOf<NotificationRuleEntity?>(null) }
+    var showDeleteAllDialog by remember { mutableStateOf(false) }
+    var showRestoreDefaultDialog by remember { mutableStateOf(false) }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -1795,9 +1798,9 @@ fun RuleListSheet(
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
+                Column(modifier = Modifier.weight(1f)) {
                     Text(
-                        text = "Aturan Notifikasi Aktif",
+                        text = "Kelola Aturan Notifikasi",
                         style = MaterialTheme.typography.titleLarge,
                         fontWeight = FontWeight.Bold
                     )
@@ -1807,58 +1810,221 @@ fun RuleListSheet(
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
-                IconButton(onClick = onAddRuleClick) {
-                    Icon(imageVector = Icons.Default.Add, contentDescription = "Tambah Aturan", tint = AccentBlue)
+
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    IconButton(onClick = onAddRuleClick) {
+                        Icon(imageVector = Icons.Default.Add, contentDescription = "Tambah Aturan", tint = AccentBlue)
+                    }
+                    IconButton(onClick = { showRestoreDefaultDialog = true }) {
+                        Icon(imageVector = Icons.Default.RestartAlt, contentDescription = "Pulihkan Default", tint = ColorIncomeDark)
+                    }
+                    if (uiState.rules.isNotEmpty()) {
+                        IconButton(onClick = { showDeleteAllDialog = true }) {
+                            Icon(imageVector = Icons.Default.DeleteSweep, contentDescription = "Hapus Semua Aturan", tint = ColorExpenseDark)
+                        }
+                    }
                 }
             }
 
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(max = 480.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                items(uiState.rules, key = { it.id }) { rule ->
-                    val isIncome = rule.txType == "INCOME"
-                    SquircleCard(
-                        backgroundColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+            if (uiState.rules.isEmpty()) {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(vertical = 32.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.Rule,
+                        contentDescription = null,
+                        tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.size(48.dp)
+                    )
+                    Text(
+                        text = "Belum Ada Aturan Notifikasi",
+                        style = MaterialTheme.typography.titleMedium,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Semua aturan telah dihapus. Anda dapat menambahkan aturan baru atau memulihkan aturan bawaan bank & e-wallet.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Button(
+                        onClick = { viewModel.restoreDefaultRules() },
+                        colors = ButtonDefaults.buttonColors(containerColor = AccentBlue),
+                        shape = RoundedCornerShape(12.dp)
                     ) {
-                        Row(
-                            modifier = Modifier.fillMaxWidth(),
-                            horizontalArrangement = Arrangement.SpaceBetween,
-                            verticalAlignment = Alignment.CenterVertically
+                        Icon(imageVector = Icons.Default.RestartAlt, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Pulihkan Aturan Bawaan Bank")
+                    }
+                }
+            } else {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = "Daftar Aturan",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    TextButton(
+                        onClick = { viewModel.enableAllRules() },
+                        contentPadding = PaddingValues(horizontal = 8.dp, vertical = 2.dp)
+                    ) {
+                        Icon(imageVector = Icons.Default.CheckCircle, contentDescription = null, modifier = Modifier.size(16.dp), tint = ColorIncomeDark)
+                        Spacer(modifier = Modifier.width(4.dp))
+                        Text("Aktifkan Semua", style = MaterialTheme.typography.labelSmall, color = ColorIncomeDark)
+                    }
+                }
+
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 480.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    items(uiState.rules, key = { it.id }) { rule ->
+                        val isIncome = rule.txType == "INCOME"
+                        SquircleCard(
+                            backgroundColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
                         ) {
-                            Column(modifier = Modifier.weight(1f)) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
-                                    Box(
-                                        modifier = Modifier
-                                            .size(8.dp)
-                                            .clip(CircleShape)
-                                            .background(if (isIncome) ColorIncomeDark else ColorExpenseDark)
-                                    )
-                                    Spacer(modifier = Modifier.width(6.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Box(
+                                            modifier = Modifier
+                                                .size(8.dp)
+                                                .clip(CircleShape)
+                                                .background(if (isIncome) ColorIncomeDark else ColorExpenseDark)
+                                        )
+                                        Spacer(modifier = Modifier.width(6.dp))
+                                        Text(
+                                            text = rule.ruleName,
+                                            style = MaterialTheme.typography.bodyMedium,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    }
+                                    Spacer(modifier = Modifier.height(2.dp))
                                     Text(
-                                        text = rule.ruleName,
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        fontWeight = FontWeight.SemiBold
+                                        text = "${rule.providerCode} • ${rule.packageName}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    Text(
+                                        text = "${if (isIncome) "Pemasukan" else "Pengeluaran"} • Cocok: ${rule.matchCount}x",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = if (rule.isEnabled) MaterialTheme.colorScheme.onSurface else MaterialTheme.colorScheme.error.copy(alpha = 0.8f)
                                     )
                                 }
-                                Spacer(modifier = Modifier.height(2.dp))
-                                Text(
-                                    text = "${rule.providerCode} • ${if (isIncome) "Pemasukan" else "Pengeluaran"} • Cocok: ${rule.matchCount}x",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                                )
+
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Switch(
+                                        checked = rule.isEnabled,
+                                        onCheckedChange = { viewModel.toggleRule(rule) }
+                                    )
+                                    IconButton(
+                                        onClick = { ruleToDelete = rule }
+                                    ) {
+                                        Icon(
+                                            imageVector = Icons.Default.Delete,
+                                            contentDescription = "Hapus Aturan",
+                                            tint = ColorExpenseDark.copy(alpha = 0.85f),
+                                            modifier = Modifier.size(20.dp)
+                                        )
+                                    }
+                                }
                             }
-                            Switch(
-                                checked = rule.isEnabled,
-                                onCheckedChange = { viewModel.toggleRule(rule) }
-                            )
                         }
                     }
                 }
             }
         }
+    }
+
+    // Dialog konfirmasi hapus 1 aturan
+    if (ruleToDelete != null) {
+        val target = ruleToDelete!!
+        AlertDialog(
+            onDismissRequest = { ruleToDelete = null },
+            title = { Text("Hapus Aturan Notifikasi", fontWeight = FontWeight.Bold) },
+            text = { Text("Apakah Anda yakin ingin menghapus aturan \"${target.ruleName}\"?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.deleteRule(target.id)
+                        ruleToDelete = null
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = ColorExpenseDark)
+                ) {
+                    Text("Hapus", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { ruleToDelete = null }) {
+                    Text("Batal")
+                }
+            }
+        )
+    }
+
+    // Dialog konfirmasi hapus semua aturan
+    if (showDeleteAllDialog) {
+        AlertDialog(
+            onDismissRequest = { showDeleteAllDialog = false },
+            title = { Text("Hapus Semua Aturan?", fontWeight = FontWeight.Bold) },
+            text = { Text("Semua aturan deteksi notifikasi akan dihapus. Anda dapat memulihkan aturan bawaan bank kapan saja.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.deleteAllRules()
+                        showDeleteAllDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = ColorExpenseDark)
+                ) {
+                    Text("Hapus Semua", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDeleteAllDialog = false }) {
+                    Text("Batal")
+                }
+            }
+        )
+    }
+
+    // Dialog konfirmasi pulihkan aturan bawaan
+    if (showRestoreDefaultDialog) {
+        AlertDialog(
+            onDismissRequest = { showRestoreDefaultDialog = false },
+            title = { Text("Pulihkan Aturan Bawaan?", fontWeight = FontWeight.Bold) },
+            text = { Text("Aturan bawaan bank & dompet digital resmi (BCA, Mandiri, BRI, BNI, SeaBank, GoPay, DANA, ShopeePay, Jago, OVO) akan dimuat kembali dan diaktifkan.") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.restoreDefaultRules()
+                        showRestoreDefaultDialog = false
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
+                ) {
+                    Text("Pulihkan", color = Color.White)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showRestoreDefaultDialog = false }) {
+                    Text("Batal")
+                }
+            }
+        )
     }
 }
 

@@ -102,6 +102,14 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                 _uiState.value = newState
             }
         }
+
+        // Auto-fix if all rules are accidentally set to disabled
+        viewModelScope.launch {
+            val existing = db.notificationRuleDao().getAllRulesList()
+            if (existing.isNotEmpty() && existing.all { !it.isEnabled }) {
+                db.notificationRuleDao().setAllRulesEnabled(true)
+            }
+        }
     }
 
     fun updateMonthlyBudget(limit: Long, thresholdPct: Int) {
@@ -140,6 +148,31 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
+    fun deleteRule(id: Long) {
+        viewModelScope.launch {
+            db.notificationRuleDao().deleteRule(id)
+        }
+    }
+
+    fun deleteAllRules() {
+        viewModelScope.launch {
+            db.notificationRuleDao().deleteAllRules()
+        }
+    }
+
+    fun restoreDefaultRules() {
+        viewModelScope.launch {
+            db.notificationRuleDao().deleteAllRules()
+            db.notificationRuleDao().insertAll(SmartSpendDatabase.getDefaultRules())
+        }
+    }
+
+    fun enableAllRules() {
+        viewModelScope.launch {
+            db.notificationRuleDao().setAllRulesEnabled(true)
+        }
+    }
+
     fun addCustomRule(
         providerCode: String,
         packageName: String,
@@ -156,6 +189,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     bodyPattern = pattern,
                     txType = txType,
                     groupMapJson = """{"amount":"amt","merchant":"mrc"}""",
+                    isEnabled = true,
                     isBuiltin = false,
                     priority = 50
                 )
