@@ -27,37 +27,61 @@ class SmartSpendIslandAccessibilityService : AccessibilityService() {
         SystemIslandOverlayManager.onAccessibilityServiceConnected(this)
     }
 
+    fun isCurrentlyOnHomeScreen(): Boolean {
+        val pkg = currentPackage ?: return true
+        // Stale self-reference (our own activity is/was foreground) carries no
+        // information about the launcher, so treat it as "unknown but plausibly home".
+        if (pkg == packageName) return true
+        return isHomeScreen(pkg)
+    }
+
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         if (event == null) return
-        android.util.Log.e("SmartSpendA11y", "onAccessibilityEvent type: ${event.eventType}, pkg: ${event.packageName}, class: ${event.className}")
-        if (event.eventType != AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED) return
 
         val pkg = event.packageName?.toString() ?: return
         val cls = event.className?.toString() ?: ""
 
-        // Crucial fix: Prevent overlay's own window event from hiding itself!
-        if (pkg == packageName) {
-            if (cls == MainActivity::class.java.name) {
+        when (event.eventType) {
+            AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED -> {
+                android.util.Log.e("SmartSpendA11y", "windowState pkg: $pkg, class: $cls")
+
+                // Crucial fix: Prevent overlay's own window event from hiding itself!
+                if (pkg == packageName) {
+                    currentPackage = pkg
+                    if (cls == MainActivity::class.java.name || cls.isBlank()) {
+                        SystemIslandOverlayManager.setIslandVisible(this, false)
+                    }
+                    return
+                }
+
+                if (ignoredSystemPackages.contains(pkg) || pkg.contains("inputmethod") || pkg.contains("keyboard")) {
+                    return
+                }
+
+                val shouldBeVisible = isHomeScreen(pkg)
+
+                // Deduplicate: only skip when the package AND the desired visibility are
+                // unchanged. A pure package check left the island permanently hidden
+                // whenever the launcher re-announced itself while currentPackage was stale.
+                if (pkg == currentPackage &&
+                    SystemIslandOverlayManager.isIslandVisible() == shouldBeVisible
+                ) {
+                    return
+                }
                 currentPackage = pkg
-                SystemIslandOverlayManager.setIslandVisible(this, false)
+
+                SystemIslandOverlayManager.setIslandVisible(this, shouldBeVisible)
             }
-            return
-        }
 
-        if (ignoredSystemPackages.contains(pkg) || pkg.contains("inputmethod") || pkg.contains("keyboard")) {
-            return
-        }
-
-        // Deduplicate: only react when foreground package ACTUALLY changes
-        if (pkg == currentPackage) return
-        currentPackage = pkg
-
-        if (isHomeScreen(pkg)) {
-            // Homescreen -> show dynamic island
-            SystemIslandOverlayManager.setIslandVisible(this, true)
-        } else {
-            // Any other app (Chrome, Settings, etc.) -> hide dynamic island
-            SystemIslandOverlayManager.setIslandVisible(this, false)
+            AccessibilityEvent.TYPE_WINDOWS_CHANGED -> {
+                // Cheap recovery signal: when the launcher reports its window set changing
+                // (app drawer closed, widget resized, screen turned on) our overlay may have
+                // been detached with no window-state event. Re-assert intent.
+                if (pkg == packageName) return
+                if (isHomeScreen(pkg) && SystemIslandOverlayManager.isIslandVisible()) {
+                    SystemIslandOverlayManager.setIslandVisible(this, true)
+                }
+            }
         }
     }
 

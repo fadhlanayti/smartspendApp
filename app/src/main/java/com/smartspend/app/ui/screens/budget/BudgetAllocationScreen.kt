@@ -332,11 +332,11 @@ private fun CategoryBudgetRow(
                         .background(categoryColor.copy(alpha = 0.15f)),
                     contentAlignment = Alignment.Center
                 ) {
-                    Box(
-                        modifier = Modifier
-                            .size(if (item.depth > 0) 8.dp else 10.dp)
-                            .clip(CircleShape)
-                            .background(categoryColor)
+                    com.smartspend.app.ui.components.CategoryIcon(
+                        iconKey = item.category.icon,
+                        categoryName = item.category.name,
+                        tint = categoryColor,
+                        modifier = Modifier.size(if (item.depth > 0) 16.dp else 20.dp)
                     )
                 }
 

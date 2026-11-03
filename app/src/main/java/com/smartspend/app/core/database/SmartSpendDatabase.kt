@@ -78,45 +78,79 @@ abstract class SmartSpendDatabase : RoomDatabase() {
             val accounts = listOf(
                 AccountEntity(
                     id = 1,
-                    name = "Tunai (Dompet)",
-                    type = "CASH",
-                    initialBalance = 150_000,
-                    currentBalance = 150_000,
-                    colorHex = "#30B350",
-                    icon = "payments"
-                ),
-                AccountEntity(
-                    id = 2,
                     name = "BCA Utama",
                     type = "BANK",
                     providerCode = "BCA",
                     packageName = "com.bca.mybca.omni.android",
                     initialBalance = 3_500_000,
                     currentBalance = 3_500_000,
-                    colorHex = "#0A84FF",
-                    icon = "account_balance"
+                    colorHex = "#005EAA",
+                    icon = "bca"
+                ),
+                AccountEntity(
+                    id = 2,
+                    name = "Mandiri Livin",
+                    type = "BANK",
+                    providerCode = "MANDIRI",
+                    packageName = "id.bmri.livin",
+                    initialBalance = 1_850_000,
+                    currentBalance = 1_850_000,
+                    colorHex = "#003D79",
+                    icon = "mandiri"
                 ),
                 AccountEntity(
                     id = 3,
-                    name = "DANA",
-                    type = "EWALLET",
-                    providerCode = "DANA",
-                    packageName = "id.dana",
-                    initialBalance = 250_000,
-                    currentBalance = 250_000,
-                    colorHex = "#118EEA",
-                    icon = "account_balance_wallet"
+                    name = "BRI Mo",
+                    type = "BANK",
+                    providerCode = "BRI",
+                    packageName = "id.co.bri.brimo",
+                    initialBalance = 1_200_000,
+                    currentBalance = 1_200_000,
+                    colorHex = "#00529C",
+                    icon = "bri"
                 ),
                 AccountEntity(
                     id = 4,
+                    name = "BNI Mobile",
+                    type = "BANK",
+                    providerCode = "BNI",
+                    packageName = "src.mwallet.bni.co.id",
+                    initialBalance = 750_000,
+                    currentBalance = 750_000,
+                    colorHex = "#F15A22",
+                    icon = "bni"
+                ),
+                AccountEntity(
+                    id = 5,
                     name = "GoPay",
                     type = "EWALLET",
                     providerCode = "GOPAY",
                     packageName = "com.gojek.app",
-                    initialBalance = 120_000,
-                    currentBalance = 120_000,
+                    initialBalance = 240_000,
+                    currentBalance = 240_000,
                     colorHex = "#00AED6",
-                    icon = "wallet"
+                    icon = "gopay"
+                ),
+                AccountEntity(
+                    id = 6,
+                    name = "DANA",
+                    type = "EWALLET",
+                    providerCode = "DANA",
+                    packageName = "id.dana",
+                    initialBalance = 180_000,
+                    currentBalance = 180_000,
+                    colorHex = "#118EEA",
+                    icon = "dana"
+                ),
+                AccountEntity(
+                    id = 7,
+                    name = "Tunai (Dompet)",
+                    type = "CASH",
+                    providerCode = "CASH",
+                    initialBalance = 350_000,
+                    currentBalance = 350_000,
+                    colorHex = "#1E7E34",
+                    icon = "cash"
                 )
             )
             accountDao.insertAll(accounts)

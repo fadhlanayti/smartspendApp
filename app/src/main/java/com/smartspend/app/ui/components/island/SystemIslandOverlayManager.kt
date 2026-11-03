@@ -48,8 +48,10 @@ object SystemIslandOverlayManager {
     private var currentAnimator: ValueAnimator? = null
     private var dismissAlertRunnable: Runnable? = null
     private var autoCollapseRunnable: Runnable? = null
+    private var attachWatchdog: Runnable? = null
     private var activeLoadJob: Job? = null
     private const val AUTO_COLLAPSE_TIMEOUT_MS = 10000L
+    private const val ATTACH_WATCHDOG_INTERVAL_MS = 2500L
 
     // Tuned for Infinix Note 30 Pro (Camera punch hole: X=468..612, Y=0..108px)
     // Small top gap (8dp) gives subtle breathing room from top screen bezel
@@ -93,15 +95,17 @@ object SystemIslandOverlayManager {
 
     fun onAccessibilityServiceConnected(service: SmartSpendIslandAccessibilityService) {
         mainHandler.post {
-            if (!isAppForeground && isVisibleState) {
-                ensureOverlayCreated(service)
-                showCompact(service)
-            }
+            if (isAppForeground) return@post
+            // A11y service restart (OEM kill, permission re-grant) wipes our reference
+            // but not the user's intent: re-derive visibility from the current screen.
+            val shouldShow = service.isCurrentlyOnHomeScreen()
+            if (shouldShow || isVisibleState) setIslandVisible(service, shouldShow)
         }
     }
 
     fun onAccessibilityServiceDisconnected() {
         mainHandler.post {
+            stopAttachWatchdog()
             autoCollapseRunnable?.let { mainHandler.removeCallbacks(it) }
             dismissAlertRunnable?.let { mainHandler.removeCallbacks(it) }
             overlayRoot = null
@@ -118,6 +122,14 @@ object SystemIslandOverlayManager {
 
     fun onAppBackground(context: Context) {
         isAppForeground = false
+        mainHandler.postDelayed({
+            if (!isAppForeground) {
+                val a11y = SmartSpendIslandAccessibilityService.instance
+                if (a11y != null && a11y.isCurrentlyOnHomeScreen()) {
+                    setIslandVisible(a11y, true)
+                }
+            }
+        }, 150L)
     }
 
     fun setIslandVisible(context: Context, visible: Boolean) {
@@ -125,9 +137,17 @@ object SystemIslandOverlayManager {
         mainHandler.post {
             if (visible && !isAppForeground) {
                 ensureOverlayCreated(context)
-                overlayRoot?.visibility = View.VISIBLE
-                showCompact(context)
+                if (isAttached) {
+                    overlayRoot?.visibility = View.VISIBLE
+                    startAttachWatchdog(context.applicationContext)
+                    showCompact(context)
+                } else {
+                    // Could not attach a window right now (service/token not ready).
+                    // Remember the intent and retry instead of silently going dark.
+                    scheduleAttachRetry(context.applicationContext)
+                }
             } else {
+                stopAttachWatchdog()
                 activeLoadJob?.cancel()
                 overlayRoot?.visibility = View.GONE
                 dismissAlertRunnable?.let { mainHandler.removeCallbacks(it) }
@@ -135,6 +155,67 @@ object SystemIslandOverlayManager {
                 currentAnimator?.cancel()
             }
         }
+    }
+
+    /** Read-only view of whether the island is supposed to be on screen right now. */
+    fun isIslandVisible(): Boolean = isVisibleState
+
+    /**
+     * Keeps the overlay window alive while it is supposed to be visible.
+     * A11y overlays get detached by the system / OEM task killers without any
+     * callback, which previously left the island blank until the next app switch.
+     */
+    private fun startAttachWatchdog(context: Context) {
+        val appContext = context.applicationContext
+        if (attachWatchdog != null) return
+        val runnable = object : Runnable {
+            override fun run() {
+                if (isAppForeground || !isVisibleState) {
+                    stopAttachWatchdog()
+                    return
+                }
+                val root = overlayRoot
+                if (root == null || !root.isAttachedToWindow) {
+                    isAttached = false
+                    overlayRoot = null
+                    activeWindowManager = null
+                    if (SmartSpendIslandAccessibilityService.instance != null) {
+                        ensureOverlayCreated(appContext)
+                        if (isAttached) {
+                            overlayRoot?.visibility = View.VISIBLE
+                            showCompact(appContext)
+                        }
+                    }
+                } else if (root.visibility != View.VISIBLE) {
+                    root.visibility = View.VISIBLE
+                }
+                mainHandler.postDelayed(this, ATTACH_WATCHDOG_INTERVAL_MS)
+            }
+        }
+        attachWatchdog = runnable
+        mainHandler.postDelayed(runnable, ATTACH_WATCHDOG_INTERVAL_MS)
+    }
+
+    private fun stopAttachWatchdog() {
+        attachWatchdog?.let { mainHandler.removeCallbacks(it) }
+        attachWatchdog = null
+    }
+
+    /** Re-attempts the window attach a few times when the first try was too early. */
+    private fun scheduleAttachRetry(context: Context, attempt: Int = 0) {
+        if (attempt >= 5) return
+        mainHandler.postDelayed({
+            if (isAppForeground || !isVisibleState || isAttached) return@postDelayed
+            if (SmartSpendIslandAccessibilityService.instance == null) return@postDelayed
+            ensureOverlayCreated(context)
+            if (isAttached) {
+                overlayRoot?.visibility = View.VISIBLE
+                startAttachWatchdog(context)
+                showCompact(context)
+            } else {
+                scheduleAttachRetry(context, attempt + 1)
+            }
+        }, ATTACH_WATCHDOG_INTERVAL_MS)
     }
 
     fun showCompact(context: Context) {

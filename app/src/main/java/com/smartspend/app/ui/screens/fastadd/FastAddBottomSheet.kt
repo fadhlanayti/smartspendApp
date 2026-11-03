@@ -1,5 +1,9 @@
 package com.smartspend.app.ui.screens.fastadd
 
+import android.net.Uri
+import android.provider.ContactsContract
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -10,6 +14,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Contacts
 import androidx.compose.material.icons.filled.HourglassTop
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -19,6 +24,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -42,6 +48,26 @@ fun FastAddBottomSheet(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val scrollState = rememberScrollState()
+    val context = LocalContext.current
+
+    // Pick a receiver from the phone's contacts so transfer/income entries carry a real name
+    val pickContactLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.PickContact()
+    ) { uri: Uri? ->
+        if (uri != null) {
+            try {
+                context.contentResolver.query(uri, null, null, null, null)?.use { c ->
+                    if (c.moveToFirst()) {
+                        val nameIdx = c.getColumnIndex(ContactsContract.Contacts.DISPLAY_NAME)
+                        if (nameIdx != -1) {
+                            val name = c.getString(nameIdx)
+                            if (!name.isNullOrBlank()) viewModel.updateMerchant(name)
+                        }
+                    }
+                }
+            } catch (_: Exception) {}
+        }
+    }
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
@@ -231,14 +257,28 @@ fun FastAddBottomSheet(
             Spacer(modifier = Modifier.height(12.dp))
 
             // Merchant / Penerima field
-            OutlinedTextField(
-                value = uiState.merchant,
-                onValueChange = { viewModel.updateMerchant(it) },
-                label = { Text("Nama Merchant / Penerima (Opsional)") },
+            Row(
                 modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(14.dp),
-                singleLine = true
-            )
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                OutlinedTextField(
+                    value = uiState.merchant,
+                    onValueChange = { viewModel.updateMerchant(it) },
+                    label = { Text("Nama Merchant / Penerima (Opsional)") },
+                    modifier = Modifier.weight(1f),
+                    shape = RoundedCornerShape(14.dp),
+                    singleLine = true
+                )
+                IconButton(
+                    onClick = { pickContactLauncher.launch(null) },
+                    modifier = Modifier
+                        .padding(top = 8.dp)
+                        .background(AccentBlue.copy(alpha = 0.15f), RoundedCornerShape(12.dp))
+                ) {
+                    Icon(Icons.Default.Contacts, contentDescription = "Pilih Kontak", tint = AccentBlue)
+                }
+            }
 
             Spacer(modifier = Modifier.height(8.dp))
 

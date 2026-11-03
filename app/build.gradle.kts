@@ -73,6 +73,9 @@ dependencies {
     // Biometric
     implementation(libs.androidx.biometric)
 
+    // Image loading from internet
+    implementation("io.coil-kt:coil-compose:2.7.0")
+
     // Coroutines
     implementation(libs.kotlinx.coroutines.android)
 

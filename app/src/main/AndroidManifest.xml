@@ -3,7 +3,8 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Permissions requested according to PRD section 7.2 -->
-    <!-- Notice: ZERO INTERNET DEPENDENCY - NO INTERNET PERMISSION -->
+    <!-- Notice: INTERNET for loading bank logos & update widgets -->
+    <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />

@@ -215,6 +215,7 @@ private fun AccountItemCard(
         ) {
             ProviderIconBadge(
                 providerCode = account.providerCode,
+                accountName = account.name,
                 customColorHex = account.colorHex,
                 size = 44
             )

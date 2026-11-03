@@ -1,7 +1,7 @@
 # SmartSpend ⚡
-> Modern Android Personal Finance Manager with System-Level Dynamic Island, Instant Notification Parser, and Glance Widgets.
+> Aplikasi Pencatat Keuangan Otomatis & Cerdas dengan Dynamic Island dan Notifikasi Realtime.
 
-SmartSpend adalah aplikasi manajemen keuangan pribadi offline-first berkinerja tinggi yang dirancang dengan estetika **Dark Obsidian & Electric Lime**. Aplikasi ini mengintegrasikan floating **Dynamic Island tingkat sistem** yang disesuaikan secara presisi dengan punch-hole kamera perangkat, auto-capture notifikasi transaksi bank/e-wallet, serta home screen widget interaktif berbasis Jetpack Glance.
+SmartSpend membantu kamu mengelola keuangan harian secara otomatis tanpa ribet mencatat manual satu per satu. Dilengkapi dengan floating **Dynamic Island** di layar utama dan integrasi notifikasi perbankan serta e-wallet Indonesia.
 
 ---
 
@@ -20,71 +20,54 @@ SmartSpend adalah aplikasi manajemen keuangan pribadi offline-first berkinerja t
 
 ---
 
-## 🌟 Fitur Utama
+## ✨ Fitur-Fitur Unggulan
 
-### 1. 🏝️ System-Level Dynamic Island (Accessibility Overlay)
-- **Punch-Hole Framing Presisi**: Dikalibrasi khusus dengan spacer tengah (`42dp`) dan safe margin atas (`8dp`) untuk membingkai punch-hole kamera fisik tanpa menutupi status bar sistem.
-- **Launcher-Only Lifecycle**: Island hanya aktif dan muncul di Home Screen / Launcher; otomatis tersembunyi (*gone*) saat membuka aplikasi lain dan muncul kembali saat ditutup ke homescreen.
-- **Auto-Collapse Cerdas (10 Detik)**: Mode expanded otomatis mengecil kembali menjadi compact pill jika tidak ada interaksi sentuh selama 10 detik (timer otomatis di-reset saat disentuh).
-- **Gestur Geser Fluid**: Swipe up untuk menciutkan expanded card secara instan dengan kurva interpolasi Apple Spring.
-- **Live Alert Banner**: Notifikasi transaksi masuk langsung memicu morphing banner pulau dengan detail merchant dan nominal.
+### 📩 1. Catat Transaksi Otomatis dari Notifikasi
+- **Tanpa Perlu Buka Aplikasi**: Setiap kamu selesai belanja, bayar QRIS, atau transfer uang, SmartSpend langsung mendeteksi notifikasi HP dan mencatat nominal serta nama tokonya secara instan.
+- **Bebas Dobel Catat**: Sistem pintar otomatis mengenali transaksi yang sama agar tidak tercatat dua kali.
+- **Deteksi Otomatis Bank & E-Wallet**: Mendukung notifikasi transaksi dari m-Banking dan dompet digital terpopuler di Indonesia.
 
-### 2. ⚡ Real-Time Notification Parser & Dedup Engine
-- Menangkap notifikasi transaksi SMS dan push app secara real-time dari bank konvensional (BCA, Mandiri, BRI, BNI) dan dompet digital (GoPay, OVO, ShopeePay, Dana).
-- **Deduplication Engine**: Mencegah pencatatan ganda melalui hashing hash/payload jendela waktu 60 detik.
-- **Amount Normalizer**: Deteksi otomatis format mata uang lokal (`Rp`, titik/koma ribuan, desimal) dengan akurasi tinggi.
+### 🏝️ 2. Dynamic Island di Layar Utama (Home Screen)
+- **Informasi Sisa Uang Harian**: Menempel pas di punch-hole kamera HP kamu untuk memantau sisa uang yang aman dibelanjakan hari ini.
+- **Tombol Cepat Catat Pengeluaran**: Ketuk pulau untuk membuka menu cepat catat uang keluar atau cek riwayat mutasi dalam 1 detik.
+- **Otomatis Menyesuaikan Layar**: Hanya muncul di layar beranda (Home Screen). Begitu kamu membuka aplikasi lain (seperti WhatsApp, Shopee, YouTube, atau Game), pulau langsung otomatis menghilang agar layar tetap bersih dan tidak terhalang.
+- **Tutup Otomatis (Auto-Collapse)**: Tampilan menu pulau akan otomatis mengecil kembali setelah 10 detik jika tidak disentuh.
 
-### 3. 🎨 Obsidian & Electric Lime Design System
-- Dibangun 100% menggunakan **Jetpack Compose** & **Material 3**.
-- Palet warna gelap kontras tinggi: Obsidian Surface (`#101216`), Hairline Border (`#1F222A`), dan aksen Electric Lime (`#CCFF00`).
-- **Animated Celestial Canvas**: Header dinamis dengan elemen matahari berputar mulus 360° (siang) atau bulan sabit bercahaya (malam) tanpa emoji statis atau gradien artifisial.
-- **Monospace Live Clock**: Jam realtime presisi dengan indikator denyut nadi hijau (*pulsing dot*).
+### 🏦 3. Dukungan Lengkap Bank & E-Wallet Populer
+Sudah dilengkapi kartu dan identitas visual resmi untuk berbagai bank dan e-wallet Indonesia:
+- **Bank**: BCA, Mandiri (Livin'), BRI (BRImo), BNI, BSI (Bank Syariah Indonesia), CIMB Niaga (OCTO), Bank Jago, SeaBank.
+- **E-Wallet**: GoPay, DANA, OVO, ShopeePay, LinkAja.
+- **Tunai**: Dompet uang fisik untuk transaksi uang kas.
 
-### 4. 📊 Budget Enveloping & Cashflow Analytics
-- **Alokasi Budget Fleksibel**: Pembagian anggaran per kategori dengan indikator visual sisa dana bulanan dan harian.
-- **Net Cashflow Tracking**: Monitoring rasio pengeluaran vs pemasukan realtime.
-- **Review Review Queue**: Antrean konfirmasi transaksi dengan tingkat keyakinan rendah agar data keuangan tetap 100% akurat.
+### 📊 4. Pantau Anggaran & Batas Belanja Harian
+- **Kategori Anggaran Bulanan**: Bagi budget untuk Makanan, Transportasi, Belanja, Tagihan, dan Hiburan.
+- **Rekomendasi Sisa Uang Harian**: Hitung otomatis berapa uang yang boleh kamu habiskan hari ini agar gaji cukup sampai akhir bulan.
+- **Grafik Arus Kas (Cashflow)**: Lihat perbandingan uang masuk vs uang keluar secara jelas.
 
-### 5. 📱 Glance AppWidget
-- Widget beranda modern berbasis **Jetpack Glance**.
-- Menyediakan snapshot saldo rekening, ringkasan pengeluaran bulan berjalan, dan tombol jalan pintas cepat (*Fast Add* & *Riwayat*).
+### 📱 5. Widget Layar Depan (Home Screen Widget)
+- Pasang widget praktis langsung di layar HP kamu untuk melihat sisa saldo rekening dan progres anggaran bulanan tanpa harus membuka aplikasi.
 
----
-
-## 🛠️ Tech Stack & Arsitektur
-
-- **Bahasa**: Kotlin (100%)
-- **UI Toolkit**: Jetpack Compose & Material 3
-- **Local Database**: Room DB (SQLite) dengan Kotlin Coroutines & Flow
-- **Widget**: AndroidX Glance AppWidget
-- **Overlay System**: Android Accessibility Service (`TYPE_ACCESSIBILITY_OVERLAY` di layer `311000`) & Android WindowManager
-- **Background Processing**: WorkManager (Daily Sweep Worker & Reminder)
-- **Local DataStore**: Preferences DataStore untuk konfigurasi & snapshot widget
-- **Arsitektur**: MVVM (Model-View-ViewModel) + Clean Architecture pattern (Repository, Dao, Engine)
+### 🔒 6. 100% Privat, Aman, dan Offline
+- Semua riwayat dan saldo keuangan tersimpan aman di perangkat kamu sendiri.
+- Tanpa perlu login akun perbankan, tanpa simpan password, dan data tidak pernah diunggah ke server pihak ketiga.
 
 ---
 
-## 🚀 Memulai (Build & Setup)
+## 🚀 Cara Menjalankan Aplikasi
 
-### Prasyarat
-- Android Studio Ladybug / Meerkat atau yang lebih baru
-- JDK 17 / JBR 17+
-- Android SDK 35 (Android 15) dengan minimal SDK 26 (Android 8.0)
-
-### Clone & Build
-```bash
-git clone https://github.com/fadhlanayti/smartspendApp.git
-cd smartspendApp
-./gradlew assembleDebug
-```
-
-### Izin yang Diperlukan pada Perangkat
-Aplikasi ini memerlukan izin sistem berikut untuk menjalankan fitur otomatisasi:
-1. **Akses Notifikasi** (`Notification Listener Service`): Untuk parsing transaksi otomatis.
-2. **Layanan Aksesibilitas** (`Accessibility Service`): Untuk mendeteksi launcher dan menampilkan Dynamic Island di atas antarmuka sistem.
-3. **Gambar di Atas Aplikasi Lain** (`SYSTEM_ALERT_WINDOW`): Untuk rendering floating overlay.
+1. Clone repositori ini:
+   ```bash
+   git clone https://github.com/fadhlanayti/smartspendApp.git
+   ```
+2. Buka folder proyek di **Android Studio**.
+3. Hubungkan perangkat Android (Android 8.0 ke atas) atau emulator.
+4. Klik **Run** atau jalankan perintah:
+   ```bash
+   ./gradlew assembleDebug
+   ```
+5. Berikan izin **Akses Notifikasi** dan **Layanan Aksesibilitas** saat pertama kali membuka aplikasi agar fitur otomatisasi dapat bekerja.
 
 ---
 
 ## 📄 Lisensi
-Hak Cipta © 2026 SmartSpend Project. Didistribusikan di bawah lisensi open source.
+SmartSpend dirilis di bawah lisensi open source.

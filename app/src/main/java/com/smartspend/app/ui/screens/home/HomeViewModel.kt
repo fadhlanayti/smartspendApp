@@ -73,6 +73,72 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
         val isListenerActive = enabledListeners?.contains(app.packageName) == true
 
         viewModelScope.launch {
+            val existing = db.accountDao().getAllAccountsList()
+            for (acc in existing) {
+                if (acc.name.contains("Tunai", ignoreCase = true) && acc.providerCode != "CASH") {
+                    db.accountDao().update(acc.copy(providerCode = "CASH", colorHex = "#1E7E34"))
+                }
+                if (acc.name.contains("BCA", ignoreCase = true) && acc.providerCode != "BCA") {
+                    db.accountDao().update(acc.copy(providerCode = "BCA", colorHex = "#005EAA"))
+                }
+            }
+            if (existing.none { it.providerCode == "MANDIRI" }) {
+                db.accountDao().insertAll(
+                    listOf(
+                        AccountEntity(
+                            name = "Mandiri Livin",
+                            type = "BANK",
+                            providerCode = "MANDIRI",
+                            packageName = "id.bmri.livin",
+                            initialBalance = 1_850_000,
+                            currentBalance = 1_850_000,
+                            colorHex = "#003D79",
+                            icon = "mandiri"
+                        ),
+                        AccountEntity(
+                            name = "BRI Mo",
+                            type = "BANK",
+                            providerCode = "BRI",
+                            packageName = "id.co.bri.brimo",
+                            initialBalance = 1_200_000,
+                            currentBalance = 1_200_000,
+                            colorHex = "#00529C",
+                            icon = "bri"
+                        ),
+                        AccountEntity(
+                            name = "BNI Mobile",
+                            type = "BANK",
+                            providerCode = "BNI",
+                            packageName = "src.mwallet.bni.co.id",
+                            initialBalance = 750_000,
+                            currentBalance = 750_000,
+                            colorHex = "#F15A22",
+                            icon = "bni"
+                        ),
+                        AccountEntity(
+                            name = "GoPay",
+                            type = "EWALLET",
+                            providerCode = "GOPAY",
+                            packageName = "com.gojek.app",
+                            initialBalance = 240_000,
+                            currentBalance = 240_000,
+                            colorHex = "#00AED6",
+                            icon = "gopay"
+                        ),
+                        AccountEntity(
+                            name = "DANA",
+                            type = "EWALLET",
+                            providerCode = "DANA",
+                            packageName = "id.dana",
+                            initialBalance = 180_000,
+                            currentBalance = 180_000,
+                            colorHex = "#118EEA",
+                            icon = "dana"
+                        )
+                    )
+                )
+            }
+
             val flowPrimary = combine(
                 repo.getRecentTransactions(5),
                 repo.needsReviewCount,

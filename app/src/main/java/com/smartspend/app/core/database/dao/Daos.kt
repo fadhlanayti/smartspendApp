@@ -123,6 +123,9 @@ interface TransactionDao {
     @Query("SELECT * FROM transactions WHERE capture_source = 'MANUAL' AND amount = :amount AND source_account_id = :accountId AND timestamp BETWEEN :startWindow AND :endWindow AND is_deleted = 0 LIMIT 1")
     suspend fun findRecentManualMatch(amount: Long, accountId: Long, startWindow: Long, endWindow: Long): TransactionEntity?
 
+    @Query("SELECT * FROM transactions WHERE capture_source = 'MANUAL' AND type = 'TRANSFER' AND amount = :amount AND destination_account_id = :accountId AND timestamp BETWEEN :startWindow AND :endWindow AND is_deleted = 0 LIMIT 1")
+    suspend fun findRecentManualTransferInto(amount: Long, accountId: Long, startWindow: Long, endWindow: Long): TransactionEntity?
+
     @Query("SELECT * FROM transactions WHERE id = :id LIMIT 1")
     suspend fun getTransactionById(id: Long): TransactionEntity?
 

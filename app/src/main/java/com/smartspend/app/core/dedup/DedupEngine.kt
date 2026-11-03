@@ -80,4 +80,21 @@ class DedupEngine(
         val endWindow = timestamp + (windowSeconds * 1000L)
         return transactionDao.findRecentManualMatch(amount, accountId, startWindow, endWindow)
     }
+
+    /**
+     * Reverse direction of [findRecentManualMatch]: an auto INCOME arriving on [accountId]
+     * right after the user manually logged a TRANSFER into that same account.
+     * This is the second leg of "pindah uang antar rekening sendiri": the bank fires
+     * "DANA masuk 10000" but the user already recorded TRANSFER BCA -> DANA 10000.
+     */
+    suspend fun findRecentManualTransferInto(
+        amount: Long,
+        accountId: Long,
+        timestamp: Long,
+        windowSeconds: Long = 300L
+    ): TransactionEntity? {
+        val startWindow = timestamp - (windowSeconds * 1000L)
+        val endWindow = timestamp + (windowSeconds * 1000L)
+        return transactionDao.findRecentManualTransferInto(amount, accountId, startWindow, endWindow)
+    }
 }

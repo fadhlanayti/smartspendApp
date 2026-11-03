@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ReceiptLong
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
@@ -396,4 +397,49 @@ fun QuickChipsRow(
             }
         }
     }
+}
+
+@Composable
+fun CategoryIcon(
+    iconKey: String?,
+    categoryName: String = "",
+    tint: Color = MaterialTheme.colorScheme.onSurface,
+    modifier: Modifier = Modifier
+) {
+    val key = (iconKey?.lowercase() ?: "").ifBlank { categoryName.lowercase() }
+    val icon: ImageVector = when {
+        key.contains("cafe") || key.contains("kopi") || key.contains("jajan") -> Icons.Default.LocalCafe
+        key.contains("restaurant") || key.contains("makan") || key.contains("food") -> Icons.Default.Restaurant
+        key.contains("fastfood") -> Icons.Default.Fastfood
+        key.contains("tol") || key.contains("parkir") -> Icons.Default.LocalParking
+        key.contains("bus") || key.contains("transportasi umum") || key.contains("kereta") -> Icons.Default.DirectionsBus
+        key.contains("car") || key.contains("mobil") || key.contains("transport") -> Icons.Default.DirectionsCar
+        key.contains("motor") || key.contains("two_wheeler") || key.contains("ojek") -> Icons.Default.TwoWheeler
+        key.contains("bensin") || key.contains("gas") || key.contains("bbm") -> Icons.Default.LocalGasStation
+        key.contains("market") || key.contains("toko") -> Icons.Default.Storefront
+        key.contains("pakaian") || key.contains("baju") || key.contains("fashion") -> Icons.Default.Checkroom
+        key.contains("elektronik") || key.contains("gadget") || key.contains("device") -> Icons.Default.Devices
+        key.contains("belanja") || key.contains("shop") -> Icons.Default.ShoppingBag
+        key.contains("air") || key.contains("water") || key.contains("pdam") -> Icons.Default.WaterDrop
+        key.contains("pulsa") || key.contains("internet") || key.contains("wifi") || key.contains("kuota") -> Icons.Default.Wifi
+        key.contains("langganan") || key.contains("subscri") || key.contains("streaming") -> Icons.Default.Subscriptions
+        key.contains("receipt") || key.contains("tagihan") || key.contains("bill") -> Icons.AutoMirrored.Filled.ReceiptLong
+        key.contains("listrik") || key.contains("bolt") || key.contains("pln") -> Icons.Default.Bolt
+        key.contains("kesehatan") || key.contains("obat") || key.contains("med") || key.contains("hospital") || key.contains("dokter") -> Icons.Default.LocalHospital
+        key.contains("hiburan") || key.contains("movie") || key.contains("bioskop") || key.contains("film") -> Icons.Default.Movie
+        key.contains("game") || key.contains("esport") -> Icons.Default.SportsEsports
+        key.contains("pendidikan") || key.contains("school") || key.contains("kuliah") || key.contains("buku") -> Icons.Default.School
+        key.contains("gaji") || key.contains("payment") || key.contains("income") -> Icons.Default.Payments
+        key.contains("transfer") || key.contains("sync") -> Icons.Default.SyncAlt
+        key.contains("rumah") || key.contains("home") -> Icons.Default.Home
+        key.contains("gym") || key.contains("fitness") -> Icons.Default.FitnessCenter
+        key.contains("flight") || key.contains("liburan") || key.contains("travel") || key.contains("pesawat") -> Icons.Default.Flight
+        else -> Icons.Default.Category
+    }
+    Icon(
+        imageVector = icon,
+        contentDescription = null,
+        tint = tint,
+        modifier = modifier
+    )
 }

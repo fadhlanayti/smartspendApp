@@ -10,6 +10,7 @@ import com.smartspend.app.core.database.entity.RawEventEntity
 import com.smartspend.app.core.database.entity.TransactionEntity
 import com.smartspend.app.core.dedup.DedupEngine
 import com.smartspend.app.core.notification.NotificationHelper
+import com.smartspend.app.core.model.TransactionType
 import com.smartspend.app.core.parser.ParserEngine
 import com.smartspend.app.core.repository.TransactionRepository
 import com.smartspend.app.ui.components.island.DynamicIslandManager
@@ -111,6 +112,26 @@ class SpendNotificationListener : NotificationListenerService() {
             account = database.accountDao().findAccountByProviderCode("CASH")
         }
         val accountId = account?.id
+
+        // Anti-redundancy: the user already logged this exact move by hand
+        // (PRD section 4.4). Covers "notifikasi BCA keluar 10.000 / DANA masuk 10.000
+        // tidak boleh dobel setelah transfer BCA -> DANA 10.000 dicatat manual".
+        if (accountId != null) {
+            val manualMatch = when (parsed.type) {
+                // Money left this account by hand already
+                TransactionType.EXPENSE ->
+                    dedupEngine.findRecentManualMatch(parsed.amount, accountId, postTime)
+                // Money arrived here because the user logged the originating TRANSFER
+                TransactionType.INCOME ->
+                    dedupEngine.findRecentManualTransferInto(parsed.amount, accountId, postTime)
+                else -> null
+            }
+            if (manualMatch != null) {
+                parsed.matchedRuleId?.let { database.notificationRuleDao().incrementMatch(it) }
+                database.rawEventDao().updateStatus(rawEventId, "SKIPPED_MANUAL_DUP")
+                return
+            }
+        }
 
         // Auto categorize
         val categoryId = categoryEngine.suggestCategory(parsed.merchant, parsed.type)

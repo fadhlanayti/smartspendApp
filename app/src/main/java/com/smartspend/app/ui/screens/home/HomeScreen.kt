@@ -503,6 +503,7 @@ fun AccountCard(
             ) {
                 ProviderIconBadge(
                     providerCode = account.providerCode,
+                    accountName = account.name,
                     customColorHex = account.colorHex,
                     size = 36
                 )
@@ -955,14 +956,33 @@ private fun CategoryMiniProgress(item: CategoryBudgetItem) {
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Text(
-            text = item.category.name,
-            style = MaterialTheme.typography.labelSmall,
-            fontWeight = FontWeight.Medium,
-            maxLines = 1,
-            overflow = TextOverflow.Ellipsis,
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
             modifier = Modifier.weight(1f)
-        )
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(24.dp)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(progressColor.copy(alpha = 0.15f)),
+                contentAlignment = Alignment.Center
+            ) {
+                com.smartspend.app.ui.components.CategoryIcon(
+                    iconKey = item.category.icon,
+                    categoryName = item.category.name,
+                    tint = progressColor,
+                    modifier = Modifier.size(14.dp)
+                )
+            }
+            Spacer(modifier = Modifier.width(8.dp))
+            Text(
+                text = item.category.name,
+                style = MaterialTheme.typography.labelSmall,
+                fontWeight = FontWeight.Medium,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
         Spacer(modifier = Modifier.width(8.dp))
         Text(
             text = "${CurrencyFormatter.format(item.spent)} / ${CurrencyFormatter.format(item.limit)}",
