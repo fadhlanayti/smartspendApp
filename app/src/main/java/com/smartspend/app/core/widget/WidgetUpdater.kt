@@ -16,10 +16,10 @@ object WidgetUpdater {
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     fun notifyDataChanged(context: Context) {
-        // Debounce 2 seconds (PRD section 6.4)
+        // Fast responsive debounce 200ms (near real-time)
         updateJob?.cancel()
         updateJob = scope.launch {
-            delay(2000L)
+            delay(200L)
             refreshSnapshot(context.applicationContext)
         }
     }
@@ -71,8 +71,14 @@ object WidgetUpdater {
         val monthExpenses = transactionDao.getExpenseTransactionsBetween(startOfMonth, endOfMonth)
         val monthTotal = monthExpenses.sumOf { it.amount + it.fee }
 
-        val remainingBudget = maxOf(0L, monthLimit - monthTotal)
-        val remainingDaily = remainingBudget / remainingDays
+        // Sisa Hari Ini calculation:
+        // 1. Budget bulan ini yang tersedia untuk sisa hari = total limit - pengeluaran sebelum hari ini
+        val priorMonthExpenses = maxOf(0L, monthTotal - todayTotal)
+        val remainingBudgetForMonth = maxOf(0L, monthLimit - priorMonthExpenses)
+        // 2. Jatah harian dasar = sisa budget bulan dibagi sisa hari
+        val dailyQuota = if (remainingDays > 0) remainingBudgetForMonth / remainingDays else 0L
+        // 3. Sisa hari ini = jatah harian dasar dikurangi pengeluaran hari ini
+        val remainingDaily = maxOf(0L, dailyQuota - todayTotal)
 
         // Total saldo semua akun aktif (yang tidak diarsipkan)
         val activeAccounts = accountDao.getActiveAccountsFlow().first()
@@ -128,6 +134,12 @@ object WidgetUpdater {
         )
 
         WidgetStateStore.updateSnapshot(context, newSnapshot)
+
+        // Update Dynamic Island overlay in real-time
+        try {
+            com.smartspend.app.ui.components.island.SystemIslandOverlayManager.onSnapshotUpdated(context, newSnapshot)
+        } catch (_: Throwable) {
+        }
 
         // Request Glance refresh
         try {

@@ -10,7 +10,9 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
@@ -37,6 +39,7 @@ import androidx.compose.ui.unit.sp
 import com.smartspend.app.core.database.entity.DebtEntity
 import com.smartspend.app.core.database.entity.NotificationRuleEntity
 import com.smartspend.app.core.database.entity.PurchasePlanEntity
+import com.smartspend.app.core.parser.AmountNormalizer
 import com.smartspend.app.ui.components.CurrencyFormatter
 import com.smartspend.app.ui.components.SquircleCard
 import com.smartspend.app.ui.screens.accounts.AccountManagerDialog
@@ -47,6 +50,7 @@ import com.smartspend.app.ui.theme.AccentBlue
 import com.smartspend.app.ui.theme.ColorExpenseDark
 import com.smartspend.app.ui.theme.ColorIncomeDark
 import com.smartspend.app.ui.theme.ColorWarning
+import com.smartspend.app.ui.theme.DarkBorder
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
@@ -75,6 +79,9 @@ fun SettingsScreen(
     var importDialogType by remember { mutableStateOf<String?>(null) }
 
     var devTapCount by remember { mutableIntStateOf(0) }
+    var showPermissionDetails by remember { mutableStateOf(false) }
+    var showEasyRuleTrainer by remember { mutableStateOf(false) }
+    var showRuleListSheet by remember { mutableStateOf(false) }
     var ruleTesterInitialData by remember { mutableStateOf<Pair<String, String>?>(null) }
     var ruleBuilderInitialData by remember { mutableStateOf<Pair<String, String>?>(null) }
 
@@ -115,119 +122,136 @@ fun SettingsScreen(
                 .padding(horizontal = 16.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
-            // Section 1: Listener status & Anti Kill
-            item {
-                Text(
-                    text = "Layanan Pendeteksi Transaksi",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.Bold
-                )
-            }
+            val allPermissionsGranted = uiState.isListenerActive && uiState.isIslandActive
 
-            item {
-                SquircleCard {
+            if (!allPermissionsGranted || showPermissionDetails) {
+                item {
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Akses Notifikasi Bank",
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = if (uiState.isListenerActive) "Aktif • Membaca notifikasi lokal" else "Belum Diizinkan • Ketuk untuk aktifkan",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = if (uiState.isListenerActive) ColorIncomeDark else ColorWarning
-                            )
-                        }
-
-                        Button(
-                            onClick = {
-                                context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
-                            },
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (uiState.isListenerActive) MaterialTheme.colorScheme.surfaceVariant else AccentBlue
-                            )
-                        ) {
-                            Text(
-                                text = if (uiState.isListenerActive) "Cek" else "Aktifkan",
-                                color = if (uiState.isListenerActive) MaterialTheme.colorScheme.onSurfaceVariant else Color.White
-                            )
+                        Text(
+                            text = "Layanan & Izin Sistem",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.Bold
+                        )
+                        if (allPermissionsGranted) {
+                            TextButton(onClick = { showPermissionDetails = false }) {
+                                Text("Sembunyikan", fontSize = 12.sp)
+                            }
                         }
                     }
-
-                    Divider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
-
-                    SettingsRowItem(
-                        icon = Icons.Default.Shield,
-                        iconTint = AccentBlue,
-                        title = "Panduan Anti-Kill Infinix / OEM",
-                        subtitle = "Cegah sistem mematikan SmartSpend di latar belakang",
-                        onClick = { showOemGuideDialog = true }
-                    )
                 }
-            }
 
-            // Section 1b: Dynamic Island access (accessibility-based, no overlay permission)
-            item {
-                SquircleCard {
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text(
-                                text = "Dynamic Island di Layar Utama",
-                                style = MaterialTheme.typography.bodyLarge,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                            Spacer(modifier = Modifier.height(2.dp))
-                            Text(
-                                text = if (uiState.isIslandActive) {
-                                    "Aktif • Tampil di atas layar utama"
-                                } else {
-                                    "Belum Diizinkan • Butuh izin Tampilkan di atas aplikasi lain"
-                                },
-                                style = MaterialTheme.typography.bodySmall,
-                                color = if (uiState.isIslandActive) ColorIncomeDark else ColorWarning
-                            )
-                        }
+                if (!uiState.isListenerActive || showPermissionDetails) {
+                    item {
+                        SquircleCard {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Akses Notifikasi Bank",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = if (uiState.isListenerActive) "Aktif • Membaca notifikasi lokal" else "Belum Diizinkan • Ketuk untuk aktifkan",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = if (uiState.isListenerActive) ColorIncomeDark else ColorWarning
+                                    )
+                                }
 
-                        Button(
-                            onClick = {
-                                val intent = Intent(
-                                    Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                                    Uri.parse("package:${context.packageName}")
-                                )
-                                context.startActivity(intent)
-                            },
-                            shape = RoundedCornerShape(12.dp),
-                            colors = ButtonDefaults.buttonColors(
-                                containerColor = if (uiState.isIslandActive) MaterialTheme.colorScheme.surfaceVariant else AccentBlue
-                            )
-                        ) {
-                            Text(
-                                text = if (uiState.isIslandActive) "Cek" else "Aktifkan",
-                                color = if (uiState.isIslandActive) MaterialTheme.colorScheme.onSurfaceVariant else Color.White
+                                Button(
+                                    onClick = {
+                                        context.startActivity(Intent(Settings.ACTION_NOTIFICATION_LISTENER_SETTINGS))
+                                    },
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = if (uiState.isListenerActive) MaterialTheme.colorScheme.surfaceVariant else AccentBlue
+                                    )
+                                ) {
+                                    Text(
+                                        text = if (uiState.isListenerActive) "Cek" else "Aktifkan",
+                                        color = if (uiState.isListenerActive) MaterialTheme.colorScheme.onSurfaceVariant else Color.White
+                                    )
+                                }
+                            }
+
+                            Divider(modifier = Modifier.padding(vertical = 12.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+
+                            SettingsRowItem(
+                                icon = Icons.Default.Shield,
+                                iconTint = AccentBlue,
+                                title = "Panduan Anti-Kill Infinix / OEM",
+                                subtitle = "Cegah sistem mematikan SmartSpend di latar belakang",
+                                onClick = { showOemGuideDialog = true }
                             )
                         }
                     }
+                }
 
-                    Spacer(modifier = Modifier.height(8.dp))
-                    Text(
-                        text = "SmartSpend memakai izin standar \u201cTampilkan di atas aplikasi lain\u201d " +
-                            "untuk menggambar kartu ringkasan pintar (Dynamic Island) di layar depan. " +
-                            "SmartSpend TIDAK memakai izin Aksesibilitas sehingga aman dan tidak memicu " +
-                            "peringatan risiko di aplikasi perbankan (SeaBank, dsb). Seluruh data transaksi tetap aman & lokal.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                if (!uiState.isIslandActive || showPermissionDetails) {
+                    item {
+                        SquircleCard {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = "Dynamic Island di Layar Utama",
+                                        style = MaterialTheme.typography.bodyLarge,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Spacer(modifier = Modifier.height(2.dp))
+                                    Text(
+                                        text = if (uiState.isIslandActive) {
+                                            "Aktif • Tampil di atas layar utama"
+                                        } else {
+                                            "Belum Diizinkan • Butuh izin Tampilkan di atas aplikasi lain"
+                                        },
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = if (uiState.isIslandActive) ColorIncomeDark else ColorWarning
+                                    )
+                                }
+
+                                Button(
+                                    onClick = {
+                                        val intent = Intent(
+                                            Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                                            Uri.parse("package:${context.packageName}")
+                                        )
+                                        context.startActivity(intent)
+                                    },
+                                    shape = RoundedCornerShape(12.dp),
+                                    colors = ButtonDefaults.buttonColors(
+                                        containerColor = if (uiState.isIslandActive) MaterialTheme.colorScheme.surfaceVariant else AccentBlue
+                                    )
+                                ) {
+                                    Text(
+                                        text = if (uiState.isIslandActive) "Cek" else "Aktifkan",
+                                        color = if (uiState.isIslandActive) MaterialTheme.colorScheme.onSurfaceVariant else Color.White
+                                    )
+                                }
+                            }
+
+                            Spacer(modifier = Modifier.height(8.dp))
+                            Text(
+                                text = "SmartSpend memakai izin standar \u201cTampilkan di atas aplikasi lain\u201d " +
+                                    "untuk menggambar kartu ringkasan pintar (Dynamic Island) di layar depan. " +
+                                    "SmartSpend TIDAK memakai izin Aksesibilitas sehingga aman dan tidak memicu " +
+                                    "peringatan risiko di aplikasi perbankan (SeaBank, dsb). Seluruh data transaksi tetap aman & lokal.",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                    }
                 }
             }
 
@@ -269,6 +293,49 @@ fun SettingsScreen(
                         subtitle = "Master bank, e-wallet, dan uang tunai",
                         onClick = { showAccountManagerDialog = true }
                     )
+                }
+            }
+
+            // Section: Notifikasi & Otomatisasi Bank (Accessible to all users without Dev Mode)
+            item {
+                Text(
+                    text = "Notifikasi & Otomatisasi Bank",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold
+                )
+            }
+
+            item {
+                SquircleCard {
+                    SettingsRowItem(
+                        icon = Icons.Default.AutoFixHigh,
+                        iconTint = ColorIncomeDark,
+                        title = "Latih Notifikasi Aplikasi Bank & Dompet",
+                        subtitle = "Ajari SmartSpend membaca pemasukan & pengeluaran dari SeaBank, BCA, DANA, GoPay, dll tanpa rumus",
+                        onClick = { showEasyRuleTrainer = true }
+                    )
+
+                    Divider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+
+                    SettingsRowItem(
+                        icon = Icons.Default.Tune,
+                        iconTint = AccentBlue,
+                        title = "Kelola Aturan Notifikasi (${uiState.rules.size})",
+                        subtitle = "Aktifkan atau matikan deteksi per aplikasi",
+                        onClick = { showRuleListSheet = true }
+                    )
+
+                    if (allPermissionsGranted) {
+                        Divider(modifier = Modifier.padding(vertical = 8.dp), color = MaterialTheme.colorScheme.outline.copy(alpha = 0.2f))
+
+                        SettingsRowItem(
+                            icon = Icons.Default.CheckCircle,
+                            iconTint = ColorIncomeDark,
+                            title = "Status Izin Sistem: Semua Aktif",
+                            subtitle = "Akses Notifikasi & Dynamic Island berjalan normal. Ketuk untuk kelola.",
+                            onClick = { showPermissionDetails = true }
+                        )
+                    }
                 }
             }
 
@@ -490,12 +557,35 @@ fun SettingsScreen(
             onOpenRuleBuilderWith = { pkg, text ->
                 ruleBuilderInitialData = Pair(pkg, text)
                 showNotificationDebugger = false
-                showRuleBuilderDialog = true
+                showEasyRuleTrainer = true
             },
             onOpenRuleTesterWith = { pkg, text ->
                 ruleTesterInitialData = Pair(pkg, text)
                 showNotificationDebugger = false
                 showRuleTesterDialog = true
+            }
+        )
+    }
+
+    if (showEasyRuleTrainer) {
+        EasyRuleTrainerSheet(
+            viewModel = viewModel,
+            initialPackage = ruleBuilderInitialData?.first,
+            initialSampleText = ruleBuilderInitialData?.second,
+            onDismiss = {
+                showEasyRuleTrainer = false
+                ruleBuilderInitialData = null
+            }
+        )
+    }
+
+    if (showRuleListSheet) {
+        RuleListSheet(
+            viewModel = viewModel,
+            onDismiss = { showRuleListSheet = false },
+            onAddRuleClick = {
+                showRuleListSheet = false
+                showEasyRuleTrainer = true
             }
         )
     }
@@ -1053,6 +1143,475 @@ fun RuleTesterDialog(
                 shape = RoundedCornerShape(12.dp)
             ) {
                 Text("Tutup")
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun EasyRuleTrainerSheet(
+    viewModel: SettingsViewModel,
+    initialPackage: String? = null,
+    initialSampleText: String? = null,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+
+    val presetApps = remember {
+        listOf(
+            Triple("SeaBank", "SEABANK", "id.co.bankbkemobile.digitalbank"),
+            Triple("BCA Mobile", "BCA", "com.bca.mybca.omni.android"),
+            Triple("Livin Mandiri", "MANDIRI", "id.bmri.livin"),
+            Triple("BRImo", "BRI", "id.co.bri.brimo"),
+            Triple("BNI Mobile", "BNI", "src.mwallet.bni.co.id"),
+            Triple("DANA", "DANA", "id.dana"),
+            Triple("GoPay", "GOPAY", "com.gojek.app"),
+            Triple("OVO", "OVO", "id.ovo"),
+            Triple("ShopeePay", "SHOPEEPAY", "com.shopee.id"),
+            Triple("Aplikasi Lain", "CUSTOM", "")
+        )
+    }
+
+    var selectedApp by remember {
+        mutableStateOf(presetApps.find { it.third == initialPackage } ?: presetApps.first())
+    }
+    var customAppName by remember { mutableStateOf("") }
+    var customPackageName by remember { mutableStateOf(initialPackage ?: "") }
+
+    var txType by remember { mutableStateOf("EXPENSE") }
+
+    val defaultExpenseKeywords = listOf("Transfer ke", "QRIS", "Pembayaran", "Transaksi Berhasil", "Bayar")
+    val defaultIncomeKeywords = listOf("Transfer Masuk", "Terima Saldo", "Top Up", "Dana Masuk", "Menerima")
+
+    var selectedKeyword by remember { mutableStateOf("Transfer ke") }
+    var customKeyword by remember { mutableStateOf("") }
+
+    var sampleText by remember { mutableStateOf(initialSampleText ?: "") }
+    var testResult by remember { mutableStateOf<String?>(null) }
+    var isTestSuccess by remember { mutableStateOf(false) }
+
+    LaunchedEffect(txType) {
+        selectedKeyword = if (txType == "EXPENSE") defaultExpenseKeywords.first() else defaultIncomeKeywords.first()
+    }
+
+    LaunchedEffect(sampleText, selectedApp, txType, selectedKeyword, customKeyword) {
+        if (sampleText.isBlank()) {
+            testResult = null
+            isTestSuccess = false
+            return@LaunchedEffect
+        }
+        val effectiveKeyword = customKeyword.trim().ifEmpty { selectedKeyword }
+        val pattern = """(?i).*?${Regex.escape(effectiveKeyword)}.*?rp\.?\s?(?<amt>[\d.,]+)(?:.*?(?:di|ke|dari)\s+(?<mrc>[a-zA-Z0-9\s.]+?))?(?:\s+berhasil|\s+sukses|$)"""
+        try {
+            val reg = Regex(pattern)
+            val match = reg.find(sampleText)
+            if (match != null) {
+                val rawAmt = match.groups["amt"]?.value ?: ""
+                val amt = AmountNormalizer.normalize(rawAmt) ?: 0L
+                val mrc = match.groups["mrc"]?.value?.trim() ?: "Umum"
+                testResult = "✓ Terdeteksi: Rp ${CurrencyFormatter.format(amt)} • $mrc (${if (txType == "EXPENSE") "Pengeluaran" else "Pemasukan"})"
+                isTestSuccess = true
+            } else {
+                val fallbackMatch = Regex("""(?i)rp\.?\s?(?<amt>[\d.,]+)""").find(sampleText)
+                if (fallbackMatch != null) {
+                    val rawAmt = fallbackMatch.groups["amt"]?.value ?: ""
+                    val amt = AmountNormalizer.normalize(rawAmt) ?: 0L
+                    testResult = "⚠️ Nominal terdeteksi: Rp ${CurrencyFormatter.format(amt)}, tapi belum mengandung kata kunci \"$effectiveKeyword\""
+                    isTestSuccess = false
+                } else {
+                    testResult = "❌ Nominal nominal Rp tidak ditemukan dalam teks sampel"
+                    isTestSuccess = false
+                }
+            }
+        } catch (_: Exception) {
+            testResult = null
+            isTestSuccess = false
+        }
+    }
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        containerColor = MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 32.dp)
+                .verticalScroll(rememberScrollState()),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "Latih Notifikasi Bank",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "Ajari SmartSpend membaca notifikasi tanpa rumus",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                IconButton(onClick = onDismiss) {
+                    Icon(imageVector = Icons.Default.Close, contentDescription = "Tutup")
+                }
+            }
+
+            // Step 1: Pilih Aplikasi
+            Text(
+                text = "1. Pilih Aplikasi Bank / Dompet",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                presetApps.forEach { app ->
+                    val isSelected = selectedApp.second == app.second
+                    FilterChip(
+                        selected = isSelected,
+                        onClick = { selectedApp = app },
+                        label = { Text(app.first, fontSize = 12.sp) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = AccentBlue.copy(alpha = 0.2f),
+                            selectedLabelColor = AccentBlue
+                        )
+                    )
+                }
+            }
+
+            if (selectedApp.second == "CUSTOM") {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = customAppName,
+                        onValueChange = { customAppName = it },
+                        label = { Text("Nama Aplikasi (misal: Blu BCA)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                    OutlinedTextField(
+                        value = customPackageName,
+                        onValueChange = { customPackageName = it },
+                        label = { Text("Package Name (misal: id.co.bcadigital.blu)") },
+                        modifier = Modifier.fillMaxWidth(),
+                        singleLine = true
+                    )
+                }
+            }
+
+            // Step 2: Jenis Transaksi
+            Text(
+                text = "2. Tentukan Aliran Uang",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                val isExpense = txType == "EXPENSE"
+                Surface(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(16.dp))
+                        .clickable { txType = "EXPENSE" }
+                        .border(
+                            width = if (isExpense) 2.dp else 1.dp,
+                            color = if (isExpense) ColorExpenseDark else DarkBorder,
+                            shape = RoundedCornerShape(16.dp)
+                        ),
+                    color = if (isExpense) ColorExpenseDark.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(ColorExpenseDark.copy(alpha = 0.2f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(imageVector = Icons.Default.ArrowOutward, contentDescription = null, tint = ColorExpenseDark)
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Pengeluaran",
+                            fontWeight = FontWeight.Bold,
+                            color = if (isExpense) ColorExpenseDark else MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "Belanja, QRIS, Bayar",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 10.sp
+                        )
+                    }
+                }
+
+                val isIncome = txType == "INCOME"
+                Surface(
+                    modifier = Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(16.dp))
+                        .clickable { txType = "INCOME" }
+                        .border(
+                            width = if (isIncome) 2.dp else 1.dp,
+                            color = if (isIncome) ColorIncomeDark else DarkBorder,
+                            shape = RoundedCornerShape(16.dp)
+                        ),
+                    color = if (isIncome) ColorIncomeDark.copy(alpha = 0.15f) else MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(14.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Box(
+                            modifier = Modifier
+                                .size(36.dp)
+                                .clip(CircleShape)
+                                .background(ColorIncomeDark.copy(alpha = 0.2f)),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Icon(imageVector = Icons.Default.CallReceived, contentDescription = null, tint = ColorIncomeDark)
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "Pemasukan",
+                            fontWeight = FontWeight.Bold,
+                            color = if (isIncome) ColorIncomeDark else MaterialTheme.colorScheme.onSurface
+                        )
+                        Text(
+                            text = "Transfer Masuk, Gaji",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            fontSize = 10.sp
+                        )
+                    }
+                }
+            }
+
+            // Step 3: Kata Kunci Pemicu
+            Text(
+                text = "3. Kata Kunci Pemicu Notifikasi",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            val activeKeywords = if (txType == "EXPENSE") defaultExpenseKeywords else defaultIncomeKeywords
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .horizontalScroll(rememberScrollState()),
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                activeKeywords.forEach { kw ->
+                    val isSelected = selectedKeyword == kw && customKeyword.isBlank()
+                    FilterChip(
+                        selected = isSelected,
+                        onClick = {
+                            selectedKeyword = kw
+                            customKeyword = ""
+                        },
+                        label = { Text(kw, fontSize = 12.sp) },
+                        colors = FilterChipDefaults.filterChipColors(
+                            selectedContainerColor = if (txType == "EXPENSE") ColorExpenseDark.copy(alpha = 0.2f) else ColorIncomeDark.copy(alpha = 0.2f),
+                            selectedLabelColor = if (txType == "EXPENSE") ColorExpenseDark else ColorIncomeDark
+                        )
+                    )
+                }
+            }
+
+            OutlinedTextField(
+                value = customKeyword,
+                onValueChange = { customKeyword = it },
+                label = { Text("Atau ketik kata kunci sendiri") },
+                placeholder = { Text("misal: debit, potongan, transfer masuk") },
+                singleLine = true,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            // Step 4: Kotak Tes / Tempel Notifikasi
+            Text(
+                text = "4. Uji Coba (Tempel Contoh Notifikasi Bank)",
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = FontWeight.SemiBold
+            )
+
+            OutlinedTextField(
+                value = sampleText,
+                onValueChange = { sampleText = it },
+                placeholder = {
+                    Text(
+                        if (txType == "EXPENSE") "Contoh: Transfer keluar sebesar Rp 50.000 ke Shopee berhasil"
+                        else "Contoh: Transfer masuk sebesar Rp 100.000 dari BUDI berhasil"
+                    )
+                },
+                maxLines = 3,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            testResult?.let { res ->
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(
+                            if (isTestSuccess) ColorIncomeDark.copy(alpha = 0.15f)
+                            else MaterialTheme.colorScheme.surfaceVariant
+                        )
+                        .padding(12.dp)
+                ) {
+                    Text(
+                        text = res,
+                        style = MaterialTheme.typography.bodySmall,
+                        fontWeight = if (isTestSuccess) FontWeight.SemiBold else FontWeight.Normal,
+                        color = if (isTestSuccess) ColorIncomeDark else MaterialTheme.colorScheme.onSurface
+                    )
+                }
+            }
+
+            // Simpan Button
+            val effectiveAppName = if (selectedApp.second == "CUSTOM") customAppName.trim().ifEmpty { "Aplikasi Kustom" } else selectedApp.first
+            val effectivePkg = if (selectedApp.second == "CUSTOM") customPackageName.trim() else selectedApp.third
+            val effectiveProvider = if (selectedApp.second == "CUSTOM") "CUSTOM" else selectedApp.second
+            val effectiveKeyword = customKeyword.trim().ifEmpty { selectedKeyword }
+
+            val canSave = effectivePkg.isNotBlank() && effectiveKeyword.isNotBlank()
+
+            Button(
+                onClick = {
+                    val pattern = """(?i).*?${Regex.escape(effectiveKeyword)}.*?rp\.?\s?(?<amt>[\d.,]+)(?:.*?(?:di|ke|dari)\s+(?<mrc>[a-zA-Z0-9\s.]+?))?(?:\s+berhasil|\s+sukses|$)"""
+                    val ruleName = "$effectiveAppName - ${if (txType == "EXPENSE") "Pengeluaran" else "Pemasukan"} ($effectiveKeyword)"
+                    viewModel.addCustomRule(
+                        providerCode = effectiveProvider,
+                        packageName = effectivePkg,
+                        ruleName = ruleName,
+                        pattern = pattern,
+                        txType = txType
+                    )
+                    Toast.makeText(context, "Aturan untuk $effectiveAppName berhasil disimpan dan aktif!", Toast.LENGTH_SHORT).show()
+                    onDismiss()
+                },
+                enabled = canSave,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(48.dp),
+                shape = RoundedCornerShape(14.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = AccentBlue)
+            ) {
+                Icon(imageVector = Icons.Default.Check, contentDescription = null, modifier = Modifier.size(18.dp))
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Simpan & Aktifkan Aturan", fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun RuleListSheet(
+    viewModel: SettingsViewModel,
+    onDismiss: () -> Unit,
+    onAddRuleClick: () -> Unit
+) {
+    val uiState by viewModel.uiState.collectAsState()
+
+    ModalBottomSheet(
+        onDismissRequest = onDismiss,
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
+        shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
+        containerColor = MaterialTheme.colorScheme.surface
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .padding(bottom = 32.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp)
+        ) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column {
+                    Text(
+                        text = "Aturan Notifikasi Aktif",
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "${uiState.rules.size} aturan terdaftar",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                IconButton(onClick = onAddRuleClick) {
+                    Icon(imageVector = Icons.Default.Add, contentDescription = "Tambah Aturan", tint = AccentBlue)
+                }
+            }
+
+            LazyColumn(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .heightIn(max = 480.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                items(uiState.rules, key = { it.id }) { rule ->
+                    val isIncome = rule.txType == "INCOME"
+                    SquircleCard(
+                        backgroundColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(8.dp)
+                                            .clip(CircleShape)
+                                            .background(if (isIncome) ColorIncomeDark else ColorExpenseDark)
+                                    )
+                                    Spacer(modifier = Modifier.width(6.dp))
+                                    Text(
+                                        text = rule.ruleName,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                }
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = "${rule.providerCode} • ${if (isIncome) "Pemasukan" else "Pengeluaran"} • Cocok: ${rule.matchCount}x",
+                                    style = MaterialTheme.typography.labelSmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                                )
+                            }
+                            Switch(
+                                checked = rule.isEnabled,
+                                onCheckedChange = { viewModel.toggleRule(rule) }
+                            )
+                        }
+                    }
+                }
             }
         }
     }

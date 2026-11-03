@@ -48,11 +48,13 @@ object SystemIslandOverlayManager {
     private var autoCollapseRunnable: Runnable? = null
     private var attachWatchdog: Runnable? = null
     private var activeLoadJob: Job? = null
+    private var snapshotObservationJob: Job? = null
     private const val AUTO_COLLAPSE_TIMEOUT_MS = 10000L
     private const val ATTACH_WATCHDOG_INTERVAL_MS = 2500L
 
-    // Positioned right below the status bar (status bar height ~36dp) so icons (wifi, clock, notifs) don't overlap
-    private const val TOP_GAP_DP = 42
+    // Tuned for Infinix Note 30 Pro (Camera punch hole: X=468..612, Y=0..108px)
+    // Small top gap (8dp) blends directly into the camera punch hole
+    private const val TOP_GAP_DP = 8
     private const val CAMERA_CUTOUT_WIDTH_DP = 42
     private const val COMPACT_WIDTH_DP = 142
     private const val COMPACT_HEIGHT_DP = 38
@@ -108,6 +110,7 @@ object SystemIslandOverlayManager {
                 if (isAttached) {
                     overlayRoot?.visibility = View.VISIBLE
                     startAttachWatchdog(context.applicationContext)
+                    startSnapshotObservation(context.applicationContext)
                     showCompact(context)
                 } else {
                     // Could not attach a window right now (service/token not ready).
@@ -116,11 +119,53 @@ object SystemIslandOverlayManager {
                 }
             } else {
                 stopAttachWatchdog()
+                stopSnapshotObservation()
                 activeLoadJob?.cancel()
                 overlayRoot?.visibility = View.GONE
                 dismissAlertRunnable?.let { mainHandler.removeCallbacks(it) }
                 autoCollapseRunnable?.let { mainHandler.removeCallbacks(it) }
                 currentAnimator?.cancel()
+            }
+        }
+    }
+
+    private fun startSnapshotObservation(context: Context) {
+        val appContext = context.applicationContext
+        if (snapshotObservationJob != null) return
+        snapshotObservationJob = scope.launch {
+            WidgetStateStore.getSnapshotFlow(appContext).collect { snapshot ->
+                lastSnapshot = snapshot
+                mainHandler.post {
+                    if (isAppForeground || !isVisibleState) return@post
+                    val card = islandCard ?: return@post
+                    if (currentMode == IslandMode.COMPACT) {
+                        card.removeAllViews()
+                        card.addView(buildCompactView(appContext, snapshot))
+                    } else if (currentMode == IslandMode.EXPANDED) {
+                        card.removeAllViews()
+                        card.addView(buildExpandedView(appContext, snapshot))
+                    }
+                }
+            }
+        }
+    }
+
+    private fun stopSnapshotObservation() {
+        snapshotObservationJob?.cancel()
+        snapshotObservationJob = null
+    }
+
+    fun onSnapshotUpdated(context: Context, snapshot: WidgetSnapshot) {
+        lastSnapshot = snapshot
+        mainHandler.post {
+            if (isAppForeground || !isVisibleState) return@post
+            val card = islandCard ?: return@post
+            if (currentMode == IslandMode.COMPACT) {
+                card.removeAllViews()
+                card.addView(buildCompactView(context.applicationContext, snapshot))
+            } else if (currentMode == IslandMode.EXPANDED) {
+                card.removeAllViews()
+                card.addView(buildExpandedView(context.applicationContext, snapshot))
             }
         }
     }

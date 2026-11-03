@@ -49,7 +49,15 @@ abstract class SmartSpendDatabase : RoomDatabase() {
 
         fun getInstance(context: Context): SmartSpendDatabase {
             return INSTANCE ?: synchronized(this) {
-                INSTANCE ?: buildDatabase(context).also { INSTANCE = it }
+                INSTANCE ?: buildDatabase(context).also { db ->
+                    INSTANCE = db
+                    CoroutineScope(Dispatchers.IO).launch {
+                        runCatching {
+                            ensureEssentialRules(db.notificationRuleDao())
+                            ensureEssentialAccounts(db.accountDao())
+                        }
+                    }
+                }
             }
         }
 
@@ -203,90 +211,203 @@ abstract class SmartSpendDatabase : RoomDatabase() {
             categoryDao.insertAll(categories)
         }
 
-        private suspend fun seedRules(ruleDao: NotificationRuleDao) {
-            val rules = listOf(
-                NotificationRuleEntity(
-                    id = 1,
-                    providerCode = "BCA",
-                    packageName = "com.bca.mybca.omni.android",
-                    ruleName = "BCA - Transfer keluar",
-                    bodyPattern = """(?i)transfer\s+rp\.?\s?(?<amt>[\d.,]+)\s+ke\s+(?<mrc>.+?)\s+berhasil""",
-                    txType = "EXPENSE",
-                    groupMapJson = """{"amount":"amt","merchant":"mrc"}""",
-                    priority = 10
-                ),
-                NotificationRuleEntity(
-                    id = 2,
-                    providerCode = "BCA",
-                    packageName = "com.bca.mybca.omni.android",
-                    ruleName = "BCA - Pembayaran QRIS",
-                    bodyPattern = """(?i)pembayaran\s+qris\s+rp\.?\s?(?<amt>[\d.,]+)\s+di\s+(?<mrc>.+?)\s+berhasil""",
-                    txType = "EXPENSE",
-                    groupMapJson = """{"amount":"amt","merchant":"mrc"}""",
-                    priority = 20
-                ),
-                NotificationRuleEntity(
-                    id = 3,
-                    providerCode = "BCA",
-                    packageName = "com.bca.mybca.omni.android",
-                    ruleName = "BCA - Dana masuk",
-                    bodyPattern = """(?i)menerima\s+rp\.?\s?(?<amt>[\d.,]+)\s+dari\s+(?<mrc>.+?)(?:\.|$|\s+saldo)""",
-                    txType = "INCOME",
-                    groupMapJson = """{"amount":"amt","merchant":"mrc"}""",
-                    priority = 30
-                ),
-                NotificationRuleEntity(
-                    id = 4,
-                    providerCode = "DANA",
-                    packageName = "id.dana",
-                    ruleName = "DANA - Pembayaran merchant",
-                    bodyPattern = """(?i)membayar\s+rp\.?\s?(?<amt>[\d.,]+)\s+ke\s+(?<mrc>.+)""",
-                    txType = "EXPENSE",
-                    groupMapJson = """{"amount":"amt","merchant":"mrc"}""",
-                    priority = 10
-                ),
-                NotificationRuleEntity(
-                    id = 5,
-                    providerCode = "DANA",
-                    packageName = "id.dana",
-                    ruleName = "DANA - Uang masuk",
-                    bodyPattern = """(?i)menerima\s+rp\.?\s?(?<amt>[\d.,]+)\s+dari\s+(?<mrc>.+)""",
-                    txType = "INCOME",
-                    groupMapJson = """{"amount":"amt","merchant":"mrc"}""",
-                    priority = 20
-                ),
-                NotificationRuleEntity(
-                    id = 6,
-                    providerCode = "DANA",
-                    packageName = "id.dana",
-                    ruleName = "DANA - Top up berhasil",
-                    bodyPattern = """(?i)top\s+up\s+dana\s+sebesar\s+rp\.?\s?(?<amt>[\d.,]+)\s+berhasil""",
-                    txType = "INCOME",
-                    groupMapJson = """{"amount":"amt"}""",
-                    priority = 30
-                ),
-                NotificationRuleEntity(
-                    id = 7,
-                    providerCode = "GOPAY",
-                    packageName = "com.gojek.app",
-                    ruleName = "GoPay - Pembayaran",
-                    bodyPattern = """(?i)(?:kamu\s+bayar|pembayaran\s+gopay)\s+rp\.?\s?(?<amt>[\d.,]+)(?:\s+(?:ke|pakai\s+gopay\s+untuk)\s+(?<mrc>.+?))?(?:\s+berhasil)?$""",
-                    txType = "EXPENSE",
-                    groupMapJson = """{"amount":"amt","merchant":"mrc"}""",
-                    priority = 10
-                ),
-                NotificationRuleEntity(
-                    id = 8,
-                    providerCode = "GOPAY",
-                    packageName = "com.gojek.app",
-                    ruleName = "GoPay - Dana masuk",
-                    bodyPattern = """(?i)menerima\s+rp\.?\s?(?<amt>[\d.,]+)\s+dari\s+(?<mrc>.+)""",
-                    txType = "INCOME",
-                    groupMapJson = """{"amount":"amt","merchant":"mrc"}""",
-                    priority = 20
-                )
+        private fun getDefaultRules(): List<NotificationRuleEntity> = listOf(
+            NotificationRuleEntity(
+                id = 1,
+                providerCode = "BCA",
+                packageName = "com.bca.mybca.omni.android",
+                ruleName = "BCA - Transfer keluar",
+                bodyPattern = """(?i)transfer\s+rp\.?\s?(?<amt>[\d.,]+)\s+ke\s+(?<mrc>.+?)\s+berhasil""",
+                txType = "EXPENSE",
+                groupMapJson = """{"amount":"amt","merchant":"mrc"}""",
+                priority = 10
+            ),
+            NotificationRuleEntity(
+                id = 2,
+                providerCode = "BCA",
+                packageName = "com.bca.mybca.omni.android",
+                ruleName = "BCA - Pembayaran QRIS",
+                bodyPattern = """(?i)pembayaran\s+qris\s+rp\.?\s?(?<amt>[\d.,]+)\s+di\s+(?<mrc>.+?)\s+berhasil""",
+                txType = "EXPENSE",
+                groupMapJson = """{"amount":"amt","merchant":"mrc"}""",
+                priority = 20
+            ),
+            NotificationRuleEntity(
+                id = 3,
+                providerCode = "BCA",
+                packageName = "com.bca.mybca.omni.android",
+                ruleName = "BCA - Dana masuk",
+                bodyPattern = """(?i)menerima\s+rp\.?\s?(?<amt>[\d.,]+)\s+dari\s+(?<mrc>.+?)(?:\.|$|\s+saldo)""",
+                txType = "INCOME",
+                groupMapJson = """{"amount":"amt","merchant":"mrc"}""",
+                priority = 30
+            ),
+            NotificationRuleEntity(
+                id = 4,
+                providerCode = "DANA",
+                packageName = "id.dana",
+                ruleName = "DANA - Pembayaran merchant",
+                bodyPattern = """(?i)membayar\s+rp\.?\s?(?<amt>[\d.,]+)\s+ke\s+(?<mrc>.+)""",
+                txType = "EXPENSE",
+                groupMapJson = """{"amount":"amt","merchant":"mrc"}""",
+                priority = 10
+            ),
+            NotificationRuleEntity(
+                id = 5,
+                providerCode = "DANA",
+                packageName = "id.dana",
+                ruleName = "DANA - Uang masuk",
+                bodyPattern = """(?i)menerima\s+rp\.?\s?(?<amt>[\d.,]+)\s+dari\s+(?<mrc>.+)""",
+                txType = "INCOME",
+                groupMapJson = """{"amount":"amt","merchant":"mrc"}""",
+                priority = 20
+            ),
+            NotificationRuleEntity(
+                id = 6,
+                providerCode = "DANA",
+                packageName = "id.dana",
+                ruleName = "DANA - Top up berhasil",
+                bodyPattern = """(?i)top\s+up\s+dana\s+sebesar\s+rp\.?\s?(?<amt>[\d.,]+)\s+berhasil""",
+                txType = "INCOME",
+                groupMapJson = """{"amount":"amt"}""",
+                priority = 30
+            ),
+            NotificationRuleEntity(
+                id = 7,
+                providerCode = "GOPAY",
+                packageName = "com.gojek.app",
+                ruleName = "GoPay - Pembayaran",
+                bodyPattern = """(?i)(?:kamu\s+bayar|pembayaran\s+gopay)\s+rp\.?\s?(?<amt>[\d.,]+)(?:\s+(?:ke|pakai\s+gopay\s+untuk)\s+(?<mrc>.+?))?(?:\s+berhasil)?$""",
+                txType = "EXPENSE",
+                groupMapJson = """{"amount":"amt","merchant":"mrc"}""",
+                priority = 10
+            ),
+            NotificationRuleEntity(
+                id = 8,
+                providerCode = "GOPAY",
+                packageName = "com.gojek.app",
+                ruleName = "GoPay - Dana masuk",
+                bodyPattern = """(?i)menerima\s+rp\.?\s?(?<amt>[\d.,]+)\s+dari\s+(?<mrc>.+)""",
+                txType = "INCOME",
+                groupMapJson = """{"amount":"amt","merchant":"mrc"}""",
+                priority = 20
+            ),
+            // SeaBank
+            NotificationRuleEntity(
+                id = 9,
+                providerCode = "SEABANK",
+                packageName = "id.co.bankbkemobile.digitalbank",
+                ruleName = "SeaBank - Transfer & Bayar",
+                bodyPattern = """(?i)(?:transfer\s+ke|transfer\s+keluar|pembayaran|qris|bayar).*?rp\.?\s?(?<amt>[\d.,]+)(?:.*?(?:ke|di)\s+(?<mrc>[a-zA-Z0-9\s.]+?))?(?:\s+berhasil|\s+sukses|$)""",
+                txType = "EXPENSE",
+                groupMapJson = """{"amount":"amt","merchant":"mrc"}""",
+                priority = 10
+            ),
+            NotificationRuleEntity(
+                id = 10,
+                providerCode = "SEABANK",
+                packageName = "id.co.bankbkemobile.digitalbank",
+                ruleName = "SeaBank - Transfer Masuk",
+                bodyPattern = """(?i)(?:transfer\s+masuk|menerima|dana\s+masuk|top\s+up).*?rp\.?\s?(?<amt>[\d.,]+)(?:.*?(?:dari)\s+(?<mrc>[a-zA-Z0-9\s.]+?))?(?:\s+berhasil|\s+sukses|$)""",
+                txType = "INCOME",
+                groupMapJson = """{"amount":"amt","merchant":"mrc"}""",
+                priority = 20
+            ),
+            // Livin' Mandiri
+            NotificationRuleEntity(
+                id = 11,
+                providerCode = "MANDIRI",
+                packageName = "id.bmri.livin",
+                ruleName = "Mandiri - Pembayaran & Transfer",
+                bodyPattern = """(?i)(?:transaksi|transfer|pembayaran|qris|bayar).*?rp\.?\s?(?<amt>[\d.,]+)(?:.*?(?:di|ke)\s+(?<mrc>[a-zA-Z0-9\s.]+?))?(?:\s+berhasil|\s+sukses|$)""",
+                txType = "EXPENSE",
+                groupMapJson = """{"amount":"amt","merchant":"mrc"}""",
+                priority = 10
+            ),
+            NotificationRuleEntity(
+                id = 12,
+                providerCode = "MANDIRI",
+                packageName = "id.bmri.livin",
+                ruleName = "Mandiri - Dana Masuk",
+                bodyPattern = """(?i)(?:transfer\s+masuk|dana\s+masuk|menerima).*?rp\.?\s?(?<amt>[\d.,]+)(?:.*?(?:dari)\s+(?<mrc>[a-zA-Z0-9\s.]+?))?(?:\s+berhasil|\s+sukses|$)""",
+                txType = "INCOME",
+                groupMapJson = """{"amount":"amt","merchant":"mrc"}""",
+                priority = 20
+            ),
+            // BRImo
+            NotificationRuleEntity(
+                id = 13,
+                providerCode = "BRI",
+                packageName = "id.co.bri.brimo",
+                ruleName = "BRImo - Transaksi & QRIS",
+                bodyPattern = """(?i)(?:transaksi|transfer|pembayaran|qris|debit).*?rp\.?\s?(?<amt>[\d.,]+)(?:.*?(?:di|ke)\s+(?<mrc>[a-zA-Z0-9\s.]+?))?(?:\s+berhasil|\s+sukses|$)""",
+                txType = "EXPENSE",
+                groupMapJson = """{"amount":"amt","merchant":"mrc"}""",
+                priority = 10
+            ),
+            NotificationRuleEntity(
+                id = 14,
+                providerCode = "BRI",
+                packageName = "id.co.bri.brimo",
+                ruleName = "BRImo - Dana Masuk",
+                bodyPattern = """(?i)(?:transfer\s+masuk|dana\s+masuk|menerima).*?rp\.?\s?(?<amt>[\d.,]+)(?:.*?(?:dari)\s+(?<mrc>[a-zA-Z0-9\s.]+?))?(?:\s+berhasil|\s+sukses|$)""",
+                txType = "INCOME",
+                groupMapJson = """{"amount":"amt","merchant":"mrc"}""",
+                priority = 20
+            ),
+            // ShopeePay
+            NotificationRuleEntity(
+                id = 15,
+                providerCode = "SHOPEEPAY",
+                packageName = "com.shopee.id",
+                ruleName = "ShopeePay - Pembayaran",
+                bodyPattern = """(?i)(?:pembayaran|kamu\s+membayar|bayar\s+ke).*?rp\.?\s?(?<amt>[\d.,]+)(?:.*?(?:di|ke)\s+(?<mrc>[a-zA-Z0-9\s.]+?))?(?:\s+berhasil|\s+sukses|$)""",
+                txType = "EXPENSE",
+                groupMapJson = """{"amount":"amt","merchant":"mrc"}""",
+                priority = 10
+            ),
+            NotificationRuleEntity(
+                id = 16,
+                providerCode = "SHOPEEPAY",
+                packageName = "com.shopee.id",
+                ruleName = "ShopeePay - Uang Masuk",
+                bodyPattern = """(?i)(?:top\s+up|transfer\s+masuk|menerima).*?rp\.?\s?(?<amt>[\d.,]+)(?:.*?(?:dari)\s+(?<mrc>[a-zA-Z0-9\s.]+?))?(?:\s+berhasil|\s+sukses|$)""",
+                txType = "INCOME",
+                groupMapJson = """{"amount":"amt","merchant":"mrc"}""",
+                priority = 20
             )
-            ruleDao.insertAll(rules)
+        )
+
+        private suspend fun seedRules(ruleDao: NotificationRuleDao) {
+            ruleDao.insertAll(getDefaultRules())
+        }
+
+        private suspend fun ensureEssentialRules(ruleDao: NotificationRuleDao) {
+            val existing = ruleDao.getAllRulesList()
+            val existingPkgs = existing.map { it.packageName }.toSet()
+            val missing = getDefaultRules().filter { it.packageName !in existingPkgs }
+            if (missing.isNotEmpty()) {
+                ruleDao.insertAll(missing)
+            }
+        }
+
+        private suspend fun ensureEssentialAccounts(accountDao: AccountDao) {
+            val existing = accountDao.getAllAccountsList()
+            val hasSeaBank = existing.any { it.providerCode == "SEABANK" || it.packageName == "id.co.bankbkemobile.digitalbank" }
+            if (!hasSeaBank) {
+                accountDao.insert(
+                    AccountEntity(
+                        name = "SeaBank",
+                        type = "BANK",
+                        providerCode = "SEABANK",
+                        packageName = "id.co.bankbkemobile.digitalbank",
+                        initialBalance = 1_000_000,
+                        currentBalance = 1_000_000,
+                        colorHex = "#FF5722",
+                        icon = "seabank"
+                    )
+                )
+            }
         }
     }
 }
