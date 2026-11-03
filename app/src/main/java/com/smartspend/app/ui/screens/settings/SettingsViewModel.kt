@@ -160,6 +160,24 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     priority = 50
                 )
             )
+
+            // Auto-create Account if not exists so transactions link directly to this bank/wallet!
+            val existingAccount = db.accountDao().findAccountByPackageAndHint(packageName, null)
+            if (existingAccount == null) {
+                val cleanName = ruleName.substringBefore("-").trim().ifEmpty { providerCode }
+                db.accountDao().insert(
+                    com.smartspend.app.core.database.entity.AccountEntity(
+                        name = cleanName,
+                        type = "BANK",
+                        providerCode = providerCode,
+                        packageName = packageName,
+                        initialBalance = 0L,
+                        currentBalance = 0L,
+                        colorHex = "#005EAA",
+                        icon = "bank"
+                    )
+                )
+            }
         }
     }
 

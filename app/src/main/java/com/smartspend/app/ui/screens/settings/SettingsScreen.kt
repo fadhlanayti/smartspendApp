@@ -1157,19 +1157,27 @@ fun EasyRuleTrainerSheet(
     onDismiss: () -> Unit
 ) {
     val context = LocalContext.current
+    val rawEvents by viewModel.rawEvents.collectAsState(initial = emptyList())
+    var showAppPickerDialog by remember { mutableStateOf(false) }
 
     val presetApps = remember {
         listOf(
             Triple("SeaBank", "SEABANK", "id.co.bankbkemobile.digitalbank"),
-            Triple("BCA Mobile", "BCA", "com.bca.mybca.omni.android"),
+            Triple("BCA Mobile", "BCA", "com.bca"),
+            Triple("myBCA", "BCA", "com.bca.mybca.omni.android"),
             Triple("Livin Mandiri", "MANDIRI", "id.bmri.livin"),
             Triple("BRImo", "BRI", "id.co.bri.brimo"),
+            Triple("Wondr BNI", "BNI", "id.bni.wondr"),
             Triple("BNI Mobile", "BNI", "src.mwallet.bni.co.id"),
+            Triple("Bank Jago", "JAGO", "com.jago.app"),
+            Triple("Bank Saqu", "SAQU", "id.bankastra.mobilebanking"),
+            Triple("Allo Bank", "ALLO", "com.allobank.indo"),
             Triple("DANA", "DANA", "id.dana"),
-            Triple("GoPay", "GOPAY", "com.gojek.app"),
+            Triple("GoPay (App)", "GOPAY", "id.gopay"),
+            Triple("Gojek", "GOPAY", "com.gojek.app"),
             Triple("OVO", "OVO", "id.ovo"),
             Triple("ShopeePay", "SHOPEEPAY", "com.shopee.id"),
-            Triple("Aplikasi Lain", "CUSTOM", "")
+            Triple("Ketik Manual", "CUSTOM", "")
         )
     }
 
@@ -1236,6 +1244,17 @@ fun EasyRuleTrainerSheet(
         shape = RoundedCornerShape(topStart = 28.dp, topEnd = 28.dp),
         containerColor = MaterialTheme.colorScheme.surface
     ) {
+        if (showAppPickerDialog) {
+            AppPickerDialog(
+                onDismiss = { showAppPickerDialog = false },
+                onAppSelected = { name, pkg ->
+                    customAppName = name
+                    customPackageName = pkg
+                    selectedApp = Triple(name, "CUSTOM", pkg)
+                }
+            )
+        }
+
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -1267,11 +1286,22 @@ fun EasyRuleTrainerSheet(
             }
 
             // Step 1: Pilih Aplikasi
-            Text(
-                text = "1. Pilih Aplikasi Bank / Dompet",
-                style = MaterialTheme.typography.labelLarge,
-                fontWeight = FontWeight.SemiBold
-            )
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "1. Pilih Aplikasi Bank / Dompet",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold
+                )
+                TextButton(onClick = { showAppPickerDialog = true }) {
+                    Icon(imageVector = Icons.Default.Apps, contentDescription = null, modifier = Modifier.size(16.dp))
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Text("Pilih dari HP", fontSize = 12.sp)
+                }
+            }
 
             Row(
                 modifier = Modifier
@@ -1279,11 +1309,29 @@ fun EasyRuleTrainerSheet(
                     .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                // Button to pick installed apps
+                FilterChip(
+                    selected = false,
+                    onClick = { showAppPickerDialog = true },
+                    label = { Text("📱 Semua App di HP...", fontSize = 12.sp, fontWeight = FontWeight.Bold) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        containerColor = AccentBlue.copy(alpha = 0.15f),
+                        labelColor = AccentBlue
+                    )
+                )
+
                 presetApps.forEach { app ->
-                    val isSelected = selectedApp.second == app.second
+                    val isSelected = (selectedApp.second == app.second && selectedApp.first == app.first) ||
+                            (selectedApp.second != "CUSTOM" && selectedApp.third == app.third)
                     FilterChip(
                         selected = isSelected,
-                        onClick = { selectedApp = app },
+                        onClick = {
+                            selectedApp = app
+                            if (app.second != "CUSTOM") {
+                                customAppName = ""
+                                customPackageName = app.third
+                            }
+                        },
                         label = { Text(app.first, fontSize = 12.sp) },
                         colors = FilterChipDefaults.filterChipColors(
                             selectedContainerColor = AccentBlue.copy(alpha = 0.2f),
@@ -1298,17 +1346,81 @@ fun EasyRuleTrainerSheet(
                     OutlinedTextField(
                         value = customAppName,
                         onValueChange = { customAppName = it },
-                        label = { Text("Nama Aplikasi (misal: Blu BCA)") },
+                        label = { Text("Nama Aplikasi (misal: Blu BCA / Bank Jago)") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
                     OutlinedTextField(
                         value = customPackageName,
                         onValueChange = { customPackageName = it },
-                        label = { Text("Package Name (misal: id.co.bcadigital.blu)") },
+                        label = { Text("Package Name (otomatis terisi bila pilih dari HP)") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
+                }
+            }
+
+            // Quick Auto-fill from recent notifications
+            if (rawEvents.isNotEmpty()) {
+                Text(
+                    text = "⚡ Notifikasi Terakhir Masuk di HP (Ketuk untuk otomatis isi):",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = AccentBlue
+                )
+
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    rawEvents.take(4).forEach { event ->
+                        val textContent = event.text ?: event.title ?: ""
+                        val appLabel = runCatching {
+                            val pm = context.packageManager
+                            val ai = pm.getApplicationInfo(event.packageName, 0)
+                            pm.getApplicationLabel(ai).toString()
+                        }.getOrDefault(event.packageName.substringAfterLast("."))
+
+                        Surface(
+                            shape = RoundedCornerShape(12.dp),
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.6f),
+                            border = androidx.compose.foundation.BorderStroke(0.8.dp, DarkBorder),
+                            modifier = Modifier
+                                .widthIn(max = 240.dp)
+                                .clickable {
+                                    customAppName = appLabel
+                                    customPackageName = event.packageName
+                                    selectedApp = Triple(appLabel, "CUSTOM", event.packageName)
+                                    sampleText = textContent
+                                    // Auto infer txType from keywords
+                                    val lower = textContent.lowercase()
+                                    if (lower.contains("masuk") || lower.contains("menerima") || lower.contains("top up") || lower.contains("terima")) {
+                                        txType = "INCOME"
+                                    } else {
+                                        txType = "EXPENSE"
+                                    }
+                                }
+                        ) {
+                            Column(modifier = Modifier.padding(10.dp)) {
+                                Text(
+                                    text = appLabel,
+                                    fontWeight = FontWeight.Bold,
+                                    fontSize = 11.5.sp,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                                Spacer(modifier = Modifier.height(2.dp))
+                                Text(
+                                    text = textContent,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    maxLines = 2,
+                                    overflow = TextOverflow.Ellipsis,
+                                    fontSize = 10.sp
+                                )
+                            }
+                        }
+                    }
                 }
             }
 
@@ -1615,6 +1727,136 @@ fun RuleListSheet(
             }
         }
     }
+}
+
+@Composable
+fun AppPickerDialog(
+    onDismiss: () -> Unit,
+    onAppSelected: (appName: String, packageName: String) -> Unit
+) {
+    val context = LocalContext.current
+    var searchQuery by remember { mutableStateOf("") }
+
+    val installedApps = remember {
+        val pm = context.packageManager
+        val intent = Intent(Intent.ACTION_MAIN, null).apply {
+            addCategory(Intent.CATEGORY_LAUNCHER)
+        }
+        val resolveInfos = pm.queryIntentActivities(intent, 0)
+        resolveInfos.map { ri ->
+            Pair(ri.loadLabel(pm).toString(), ri.activityInfo.packageName)
+        }.distinctBy { it.second }.sortedBy { it.first.lowercase() }
+    }
+
+    val filteredApps = remember(searchQuery, installedApps) {
+        if (searchQuery.isBlank()) installedApps
+        else installedApps.filter {
+            it.first.contains(searchQuery, ignoreCase = true) ||
+            it.second.contains(searchQuery, ignoreCase = true)
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = {
+            Column {
+                Text(
+                    text = "Pilih Aplikasi dari HP",
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = "Pilih aplikasi bank atau e-wallet yang terpasang di HP ini",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+        },
+        text = {
+            Column(
+                modifier = Modifier.fillMaxWidth(),
+                verticalArrangement = Arrangement.spacedBy(10.dp)
+            ) {
+                OutlinedTextField(
+                    value = searchQuery,
+                    onValueChange = { searchQuery = it },
+                    placeholder = { Text("Cari nama aplikasi...") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth(),
+                    trailingIcon = {
+                        Icon(imageVector = Icons.Default.Search, contentDescription = null)
+                    }
+                )
+
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(max = 380.dp),
+                    verticalArrangement = Arrangement.spacedBy(6.dp)
+                ) {
+                    items(filteredApps, key = { it.second }) { (name, pkg) ->
+                        Surface(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(12.dp))
+                                .clickable {
+                                    onAppSelected(name, pkg)
+                                    onDismiss()
+                                },
+                            color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
+                        ) {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(10.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .size(34.dp)
+                                        .clip(CircleShape)
+                                        .background(AccentBlue.copy(alpha = 0.15f)),
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Text(
+                                        text = name.firstOrNull()?.uppercase() ?: "A",
+                                        fontWeight = FontWeight.Bold,
+                                        color = AccentBlue,
+                                        fontSize = 15.sp
+                                    )
+                                }
+                                Spacer(modifier = Modifier.width(10.dp))
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(
+                                        text = name,
+                                        style = MaterialTheme.typography.bodyMedium,
+                                        fontWeight = FontWeight.SemiBold
+                                    )
+                                    Text(
+                                        text = pkg,
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                                        fontSize = 9.5.sp
+                                    )
+                                }
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.5f),
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Tutup")
+            }
+        }
+    )
 }
 
 @OptIn(ExperimentalMaterial3Api::class)
