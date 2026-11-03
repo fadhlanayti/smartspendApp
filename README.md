@@ -25,6 +25,7 @@ SmartSpend membantu kamu mengelola keuangan harian secara otomatis tanpa ribet m
 ### 📩 1. Catat Transaksi Otomatis dari Notifikasi
 - **Tanpa Perlu Buka Aplikasi**: Setiap kamu selesai belanja, bayar QRIS, atau transfer uang, SmartSpend langsung mendeteksi notifikasi HP dan mencatat nominal serta nama tokonya secara instan.
 - **Bebas Dobel Catat**: Sistem pintar otomatis mengenali transaksi yang sama agar tidak tercatat dua kali.
+- **Pindah Uang Antar Rekening Sendiri**: Saat kamu mencatat transfer dari rekening A ke rekening B secara manual, notifikasi susulan ("BCA keluar 10.000" lalu "DANA masuk 10.000") tidak akan dicatat lagi sebagai transaksi baru.
 - **Deteksi Otomatis Bank & E-Wallet**: Mendukung notifikasi transaksi dari m-Banking dan dompet digital terpopuler di Indonesia.
 
 ### 🏝️ 2. Dynamic Island di Layar Utama (Home Screen)
@@ -32,6 +33,7 @@ SmartSpend membantu kamu mengelola keuangan harian secara otomatis tanpa ribet m
 - **Tombol Cepat Catat Pengeluaran**: Ketuk pulau untuk membuka menu cepat catat uang keluar atau cek riwayat mutasi dalam 1 detik.
 - **Otomatis Menyesuaikan Layar**: Hanya muncul di layar beranda (Home Screen). Begitu kamu membuka aplikasi lain (seperti WhatsApp, Shopee, YouTube, atau Game), pulau langsung otomatis menghilang agar layar tetap bersih dan tidak terhalang.
 - **Tutup Otomatis (Auto-Collapse)**: Tampilan menu pulau akan otomatis mengecil kembali setelah 10 detik jika tidak disentuh.
+- **Selalu Pulih Sendiri**: Jika sistem HP menutup paksa tampilan pulau (mode hemat baterai, aplikasi pembersih RAM), pulau akan otomatis muncul kembali dalam hitungan detik.
 
 ### 🏦 3. Dukungan Lengkap Bank & E-Wallet Populer
 Sudah dilengkapi kartu dan identitas visual resmi untuk berbagai bank dan e-wallet Indonesia:
@@ -50,6 +52,10 @@ Sudah dilengkapi kartu dan identitas visual resmi untuk berbagai bank dan e-wall
 ### 🔒 6. 100% Privat, Aman, dan Offline
 - Semua riwayat dan saldo keuangan tersimpan aman di perangkat kamu sendiri.
 - Tanpa perlu login akun perbankan, tanpa simpan password, dan data tidak pernah diunggah ke server pihak ketiga.
+
+### 👥 7. Pilih Penerima Langsung dari Kontak
+- Saat mencatat transfer atau pemasukan, kamu bisa memilih nama penerima dari daftar kontak HP dengan satu ketukan — tidak perlu mengetik ulang.
+- Berguna juga untuk mengingatkan orang yang berutang lewat WhatsApp langsung dari daftar utang-piutang.
 
 ---
 
