@@ -7,6 +7,7 @@ import android.os.Build
 import android.provider.ContactsContract
 import android.provider.Settings
 import android.widget.Toast
+import java.util.Calendar
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
@@ -2334,8 +2335,28 @@ fun AddDebtDialog(
     var phoneNumber by remember { mutableStateOf("") }
     var amountStr by remember { mutableStateOf("") }
     var note by remember { mutableStateOf("") }
-    var recordToBalance by remember { mutableStateOf(true) }
-    var selectedAccId by remember { mutableStateOf(accounts.firstOrNull()?.id) }
+    var dueDateMillis by remember { mutableStateOf(System.currentTimeMillis() + (7 * 86_400_000L)) }
+    var selectedPresetIndex by remember { mutableIntStateOf(0) } // 0: 1 Minggu, 1: 2 Minggu, 2: 1 Bulan, 3: Kustom
+
+    val openDatePicker = {
+        val cal = Calendar.getInstance().apply { timeInMillis = dueDateMillis }
+        val dialog = android.app.DatePickerDialog(
+            context,
+            { _, year, month, dayOfMonth ->
+                val newCal = Calendar.getInstance().apply {
+                    set(year, month, dayOfMonth, 23, 59, 59)
+                    set(Calendar.MILLISECOND, 999)
+                }
+                dueDateMillis = newCal.timeInMillis
+                selectedPresetIndex = 3
+            },
+            cal.get(Calendar.YEAR),
+            cal.get(Calendar.MONTH),
+            cal.get(Calendar.DAY_OF_MONTH)
+        )
+        dialog.datePicker.minDate = System.currentTimeMillis()
+        dialog.show()
+    }
 
     val pickContactLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.PickContact()
@@ -2453,6 +2474,76 @@ fun AddDebtDialog(
                 modifier = Modifier.fillMaxWidth()
             )
 
+            // --- Periode Jatuh Tempo ---
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(
+                    text = "Periode Jatuh Tempo",
+                    style = MaterialTheme.typography.labelMedium,
+                    fontWeight = FontWeight.SemiBold,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    val presets = listOf("1 Minggu" to 7, "2 Minggu" to 14, "1 Bulan" to 30)
+                    presets.forEachIndexed { index, (label, days) ->
+                        FilterChipItem(
+                            label = label,
+                            isSelected = selectedPresetIndex == index,
+                            onClick = {
+                                selectedPresetIndex = index
+                                val cal = Calendar.getInstance().apply {
+                                    add(Calendar.DAY_OF_YEAR, days)
+                                    set(Calendar.HOUR_OF_DAY, 23)
+                                    set(Calendar.MINUTE, 59)
+                                    set(Calendar.SECOND, 59)
+                                }
+                                dueDateMillis = cal.timeInMillis
+                            },
+                            modifier = Modifier.weight(1f)
+                        )
+                    }
+                }
+
+                Surface(
+                    onClick = openDatePicker,
+                    shape = RoundedCornerShape(12.dp),
+                    color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column {
+                            Text(
+                                text = "Tanggal Jatuh Tempo",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                            Spacer(modifier = Modifier.height(2.dp))
+                            Text(
+                                text = SimpleDateFormat("EEEE, d MMMM yyyy", Locale("id", "ID")).format(Date(dueDateMillis)),
+                                style = MaterialTheme.typography.bodyMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = AccentBlue
+                            )
+                        }
+                        Icon(
+                            imageVector = Icons.Default.CalendarToday,
+                            contentDescription = "Pilih Tanggal Jatuh Tempo",
+                            tint = AccentBlue,
+                            modifier = Modifier.size(20.dp)
+                        )
+                    }
+                }
+            }
+
             OutlinedTextField(
                 value = note,
                 onValueChange = { note = it },
@@ -2476,13 +2567,13 @@ fun AddDebtDialog(
                     onClick = {
                         val amt = amountStr.toLongOrNull() ?: 0L
                         if (amt > 0 && counterparty.isNotBlank()) {
-                            val due = System.currentTimeMillis() + (7 * 86_400_000L)
                             val finalNote = if (phoneNumber.isNotBlank()) {
                                 if (note.isNotBlank()) "WA: $phoneNumber | $note" else "WA: $phoneNumber"
                             } else {
                                 note.ifBlank { null }
                             }
-                            onSave(direction, counterparty.trim(), amt, due, selectedAccId, recordToBalance, finalNote)
+                            // Murni pencatatan: recordToBalance = false, accountId = null
+                            onSave(direction, counterparty.trim(), amt, dueDateMillis, null, false, finalNote)
                         }
                     },
                     modifier = Modifier.weight(1f),
@@ -2517,8 +2608,8 @@ fun SendDebtReminderDialog(
 
     val templates = remember(debt.counterpartyName, remainingStr, dateStr) {
         listOf(
-            "Santai" to "Halo ${debt.counterpartyName}, cuma mau ngingetin titipan/pinjaman sebesar $remainingStr yang jatuh tempo $dateStr ya. Nanti kalau senggang boleh ditransfer. Makasih banyak! 🙏",
-            "Sopan" to "Halo Kak ${debt.counterpartyName}, semoga harimu menyenangkan. Sekadar mengingatkan kewajiban pinjaman sebesar $remainingStr dengan jatuh tempo $dateStr. Terima kasih sebelumnya atas kerjasamanya 🙏",
+            "Santai" to "Halo ${debt.counterpartyName}, cuma mau ngingetin titipan/pinjaman sebesar $remainingStr yang jatuh tempo $dateStr ya. Nanti kalau senggang boleh ditransfer. Makasih banyak!",
+            "Sopan" to "Halo Kak ${debt.counterpartyName}, semoga harimu menyenangkan. Sekadar mengingatkan kewajiban pinjaman sebesar $remainingStr dengan jatuh tempo $dateStr. Terima kasih sebelumnya atas kerjasamanya.",
             "Formal" to "Yth. ${debt.counterpartyName}, pemberitahuan pengingat perihal pinjaman sebesar $remainingStr yang jatuh tempo pada $dateStr. Mohon kesediaannya untuk melakukan pembayaran. Terima kasih.",
             "Singkat" to "Halo ${debt.counterpartyName}, jangan lupa transfer $remainingStr ya. Makasih!"
         )

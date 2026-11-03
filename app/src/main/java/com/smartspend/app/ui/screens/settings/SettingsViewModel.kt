@@ -12,6 +12,7 @@ import com.smartspend.app.core.parser.ParsedTransaction
 import com.smartspend.app.core.parser.ParserEngine
 import com.smartspend.app.core.repository.TransactionRepository
 import com.smartspend.app.core.widget.WidgetStateStore
+import com.smartspend.app.core.widget.WidgetUpdater
 import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.launch
 import org.json.JSONArray
@@ -215,7 +216,7 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
         }
     }
 
-    // Debts operations
+    // Debts operations - Murni pencatatan (tanpa membuat transaksi baru di riwayat)
     fun addDebt(
         direction: String,
         counterparty: String,
@@ -232,27 +233,13 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     counterpartyName = counterparty,
                     principalAmount = amount,
                     dueDate = dueDate,
-                    accountId = accountId,
-                    recordToBalance = recordToBalance,
+                    accountId = null,
+                    recordToBalance = false,
                     note = note
                 )
             )
 
-            // If recordToBalance, create loan disbursement transaction
-            if (recordToBalance && accountId != null) {
-                val txType = if (direction == "OWE") "INCOME" else "EXPENSE"
-                val tx = TransactionEntity(
-                    type = txType,
-                    amount = amount,
-                    sourceAccountId = if (txType == "EXPENSE") accountId else null,
-                    destinationAccountId = if (txType == "INCOME") accountId else null,
-                    merchant = counterparty,
-                    note = "Pencairan Pinjaman: $counterparty",
-                    debtId = debtId,
-                    excludeFromReports = true
-                )
-                repo.insertTransaction(tx)
-            }
+            // Murni pencatatan: tidak memasukkan ke tabel transaksi
 
             // Schedule default reminder (H-3, H-1, day-0)
             if (dueDate != null) {
@@ -266,6 +253,8 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
                     )
                 )
             }
+
+            WidgetUpdater.refreshSnapshot(getApplication())
         }
     }
 
@@ -275,27 +264,12 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             val isPaidOff = newPaid >= debt.principalAmount
             val newStatus = if (isPaidOff) "PAID" else "ACTIVE"
 
-            var txId: Long? = null
-            if (debt.recordToBalance && debt.accountId != null) {
-                val txType = if (debt.direction == "OWE") "EXPENSE" else "INCOME"
-                val tx = TransactionEntity(
-                    type = txType,
-                    amount = paymentAmount,
-                    sourceAccountId = if (txType == "EXPENSE") debt.accountId else null,
-                    destinationAccountId = if (txType == "INCOME") debt.accountId else null,
-                    merchant = debt.counterpartyName,
-                    note = "Pembayaran Utang: ${debt.counterpartyName}",
-                    debtId = debt.id,
-                    excludeFromReports = true
-                )
-                txId = repo.insertTransaction(tx)
-            }
-
+            // Murni pencatatan: tidak memasukkan ke tabel transaksi
             db.debtPaymentDao().insert(
                 DebtPaymentEntity(
                     debtId = debt.id,
                     amount = paymentAmount,
-                    transactionId = txId,
+                    transactionId = null,
                     note = note
                 )
             )
@@ -311,6 +285,23 @@ class SettingsViewModel(application: Application) : AndroidViewModel(application
             if (isPaidOff) {
                 db.reminderDao().disableForDebt(debt.id)
             }
+
+            WidgetUpdater.refreshSnapshot(getApplication())
+        }
+    }
+
+    fun deleteDebt(id: Long) {
+        viewModelScope.launch {
+            db.debtDao().softDelete(id)
+            db.reminderDao().disableForDebt(id)
+            WidgetUpdater.refreshSnapshot(getApplication())
+        }
+    }
+
+    fun restoreDebt(id: Long) {
+        viewModelScope.launch {
+            db.debtDao().restore(id)
+            WidgetUpdater.refreshSnapshot(getApplication())
         }
     }
 

@@ -279,6 +279,9 @@ interface DebtDao {
     @Query("UPDATE debts SET is_deleted = 1, updated_at = :updatedAt WHERE id = :id")
     suspend fun softDelete(id: Long, updatedAt: Long = System.currentTimeMillis())
 
+    @Query("UPDATE debts SET is_deleted = 0, updated_at = :updatedAt WHERE id = :id")
+    suspend fun restore(id: Long, updatedAt: Long = System.currentTimeMillis())
+
     @Query("SELECT * FROM debts")
     suspend fun getAllDebtsList(): List<DebtEntity>
 

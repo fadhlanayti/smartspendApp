@@ -142,12 +142,12 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             }
 
             val flowPrimary = combine(
-                repo.getRecentTransactions(5),
+                repo.allTransactions,
                 repo.needsReviewCount,
                 db.accountDao().getActiveAccountsFlow(),
                 db.categoryDao().getActiveCategoriesFlow()
-            ) { recentTx, needsReview, accounts, categories ->
-                PrimaryHomeData(recentTx, needsReview, accounts, categories)
+            ) { allTx, needsReview, accounts, categories ->
+                PrimaryHomeData(allTx.take(5), needsReview, accounts, categories)
             }
 
             val flowSecondary = combine(

@@ -20,6 +20,7 @@ import com.smartspend.app.core.database.entity.DebtEntity
 import com.smartspend.app.core.database.entity.PurchasePlanEntity
 import com.smartspend.app.ui.components.CurrencyFormatter
 import com.smartspend.app.ui.components.SquircleCard
+import com.smartspend.app.ui.components.SwipeableDebtItem
 import com.smartspend.app.ui.screens.settings.AddDebtDialog
 import com.smartspend.app.ui.screens.settings.DebtCardItem
 import com.smartspend.app.ui.screens.settings.PlanCardItem
@@ -31,6 +32,7 @@ import com.smartspend.app.ui.theme.AccentBlue
 import com.smartspend.app.ui.theme.ColorExpenseDark
 import com.smartspend.app.ui.theme.ColorIncomeDark
 import com.smartspend.app.ui.theme.ColorWarning
+import kotlinx.coroutines.launch
 
 /**
  * Halaman fitur non-pengaturan: Utang-Piutang dan Rencana Beli (Anti-FOMO).
@@ -49,6 +51,8 @@ fun FeaturesScreen(
     var selectedDebtForPayment by remember { mutableStateOf<DebtEntity?>(null) }
     var selectedDebtForReminder by remember { mutableStateOf<DebtEntity?>(null) }
     var selectedPlanForDecision by remember { mutableStateOf<PurchasePlanEntity?>(null) }
+    val snackbarHostState = remember { SnackbarHostState() }
+    val scope = rememberCoroutineScope()
 
     val totalOwe = uiState.debts
         .filter { !it.isDeleted && it.direction == "OWE" && it.status != "PAID" }
@@ -60,6 +64,7 @@ fun FeaturesScreen(
     BackHandler(onBack = onBack)
 
     Scaffold(
+        snackbarHost = { SnackbarHost(snackbarHostState) },
         contentWindowInsets = WindowInsets(0.dp, 0.dp, 0.dp, 0.dp),
         topBar = {
             TopAppBar(
@@ -168,10 +173,23 @@ fun FeaturesScreen(
                 }
             } else {
                 items(uiState.debts.filter { !it.isDeleted }, key = { it.id }) { debt ->
-                    DebtCardItem(
+                    SwipeableDebtItem(
                         debt = debt,
                         onPaymentClick = { selectedDebtForPayment = debt },
-                        onShareClick = { selectedDebtForReminder = debt }
+                        onShareClick = { selectedDebtForReminder = debt },
+                        onDelete = {
+                            viewModel.deleteDebt(debt.id)
+                            scope.launch {
+                                val res = snackbarHostState.showSnackbar(
+                                    message = "Catatan utang-piutang dihapus",
+                                    actionLabel = "Urungkan",
+                                    duration = SnackbarDuration.Short
+                                )
+                                if (res == SnackbarResult.ActionPerformed) {
+                                    viewModel.restoreDebt(debt.id)
+                                }
+                            }
+                        }
                     )
                 }
             }

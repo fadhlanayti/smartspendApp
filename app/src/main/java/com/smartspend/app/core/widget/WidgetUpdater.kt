@@ -16,10 +16,8 @@ object WidgetUpdater {
     private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
     fun notifyDataChanged(context: Context) {
-        // Fast responsive debounce 200ms (near real-time)
         updateJob?.cancel()
         updateJob = scope.launch {
-            delay(200L)
             refreshSnapshot(context.applicationContext)
         }
     }

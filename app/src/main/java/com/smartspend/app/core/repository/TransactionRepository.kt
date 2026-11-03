@@ -73,7 +73,7 @@ class TransactionRepository(
             budgetEvaluator.evaluateMonthlyBudget()
         }
 
-        WidgetUpdater.notifyDataChanged(context)
+        WidgetUpdater.refreshSnapshot(context)
     }
 
     suspend fun deleteTransaction(id: Long) {
@@ -86,7 +86,7 @@ class TransactionRepository(
             updateDailySummary(tx, isReversal = true)
         }
 
-        WidgetUpdater.notifyDataChanged(context)
+        WidgetUpdater.refreshSnapshot(context)
     }
 
     suspend fun restoreTransaction(id: Long) {
@@ -99,7 +99,7 @@ class TransactionRepository(
             updateDailySummary(tx, isReversal = false)
         }
 
-        WidgetUpdater.notifyDataChanged(context)
+        WidgetUpdater.refreshSnapshot(context)
     }
 
     private suspend fun applyBalanceChange(tx: TransactionEntity, isReversal: Boolean) {
