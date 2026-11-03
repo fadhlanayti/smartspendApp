@@ -145,7 +145,7 @@ object NotificationHelper {
 
         val notification = NotificationCompat.Builder(context, CHANNEL_SYSTEM)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
-            .setContentTitle("🚀 SmartSpend Push Notification Aktif!")
+            .setContentTitle("SmartSpend Push Notification Aktif")
             .setContentText("Sistem notifikasi lokal dan heads-up banner berfungsi normal di HP ini.")
             .setStyle(NotificationCompat.BigTextStyle().bigText("Sistem notifikasi lokal dan heads-up banner berfungsi normal di HP ini. Transaksi dan peringatan budget akan otomatis muncul di sini."))
             .setPriority(NotificationCompat.PRIORITY_HIGH)
@@ -154,6 +154,47 @@ object NotificationHelper {
             .build()
 
         NotificationManagerCompat.from(context).notify(9999, notification)
+    }
+
+    const val NOTIFICATION_ID_RESTORE_ISLAND = 8888
+    const val ACTION_RESTORE_ISLAND = "com.smartspend.app.ACTION_RESTORE_ISLAND"
+
+    fun showRestoreIslandNotification(context: Context) {
+        if (!hasNotificationPermission(context)) return
+
+        createNotificationChannels(context)
+
+        val restoreIntent = Intent(context, com.smartspend.app.ui.components.island.IslandRestoreReceiver::class.java).apply {
+            action = ACTION_RESTORE_ISLAND
+        }
+        val pendingRestore = PendingIntent.getBroadcast(
+            context,
+            NOTIFICATION_ID_RESTORE_ISLAND,
+            restoreIntent,
+            PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        )
+
+        val notification = NotificationCompat.Builder(context, CHANNEL_SYSTEM)
+            .setSmallIcon(R.drawable.ic_launcher_foreground)
+            .setContentTitle("Dynamic Island Disembunyikan")
+            .setContentText("Ketuk untuk menyalakan kembali Dynamic Island di layar")
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .setOngoing(true)
+            .setAutoCancel(false)
+            .setContentIntent(pendingRestore)
+            .addAction(
+                R.drawable.ic_launcher_foreground,
+                "Nyalakan",
+                pendingRestore
+            )
+            .build()
+
+        NotificationManagerCompat.from(context).notify(NOTIFICATION_ID_RESTORE_ISLAND, notification)
+    }
+
+    fun cancelRestoreIslandNotification(context: Context) {
+        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as? NotificationManager
+        nm?.cancel(NOTIFICATION_ID_RESTORE_ISLAND)
     }
 
     fun hasNotificationPermission(context: Context): Boolean {

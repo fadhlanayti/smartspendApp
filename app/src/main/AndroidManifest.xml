@@ -92,6 +92,15 @@
                 android:resource="@xml/smartspend_widget_info" />
         </receiver>
 
+        <!-- Dynamic Island Restore Receiver -->
+        <receiver
+            android:name=".ui.components.island.IslandRestoreReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.smartspend.app.ACTION_RESTORE_ISLAND" />
+            </intent-filter>
+        </receiver>
+
     </application>
 
 </manifest>
