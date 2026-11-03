@@ -48,6 +48,7 @@ object SystemIslandOverlayManager {
     private var currentAnimator: ValueAnimator? = null
     private var dismissAlertRunnable: Runnable? = null
     private var autoCollapseRunnable: Runnable? = null
+    private var activeLoadJob: Job? = null
     private const val AUTO_COLLAPSE_TIMEOUT_MS = 10000L
 
     // Tuned for Infinix Note 30 Pro (Camera punch hole: X=468..612, Y=0..108px)
@@ -127,6 +128,7 @@ object SystemIslandOverlayManager {
                 overlayRoot?.visibility = View.VISIBLE
                 showCompact(context)
             } else {
+                activeLoadJob?.cancel()
                 overlayRoot?.visibility = View.GONE
                 dismissAlertRunnable?.let { mainHandler.removeCallbacks(it) }
                 autoCollapseRunnable?.let { mainHandler.removeCallbacks(it) }
@@ -137,16 +139,17 @@ object SystemIslandOverlayManager {
 
     fun showCompact(context: Context) {
         val appContext = context.applicationContext
-        if (isAppForeground || !canDrawOverlays(appContext)) return
+        if (isAppForeground || !isVisibleState || !canDrawOverlays(appContext)) return
 
-        scope.launch {
+        activeLoadJob?.cancel()
+        activeLoadJob = scope.launch {
             val snapshot = runCatching {
                 WidgetStateStore.getSnapshotFlow(appContext).first()
             }.getOrDefault(WidgetSnapshot())
             lastSnapshot = snapshot
 
             mainHandler.post {
-                if (isAppForeground) return@post
+                if (isAppForeground || !isVisibleState) return@post
                 transitionToMode(appContext, IslandMode.COMPACT)
             }
         }
@@ -154,16 +157,17 @@ object SystemIslandOverlayManager {
 
     fun expand(context: Context) {
         val appContext = context.applicationContext
-        if (isAppForeground || !canDrawOverlays(appContext)) return
+        if (isAppForeground || !isVisibleState || !canDrawOverlays(appContext)) return
 
-        scope.launch {
+        activeLoadJob?.cancel()
+        activeLoadJob = scope.launch {
             val snapshot = runCatching {
                 WidgetStateStore.getSnapshotFlow(appContext).first()
             }.getOrDefault(WidgetSnapshot())
             lastSnapshot = snapshot
 
             mainHandler.post {
-                if (isAppForeground) return@post
+                if (isAppForeground || !isVisibleState) return@post
                 dismissAlertRunnable?.let { mainHandler.removeCallbacks(it) }
                 transitionToMode(appContext, IslandMode.EXPANDED)
             }
@@ -336,6 +340,10 @@ object SystemIslandOverlayManager {
         val bg = cardBackground ?: return
         val lp = windowLayoutParams ?: return
 
+        if (isAppForeground || !isVisibleState) {
+            root.visibility = View.GONE
+            return
+        }
         root.visibility = View.VISIBLE
 
         val fromMode = currentMode

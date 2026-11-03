@@ -2,7 +2,9 @@ package com.smartspend.app.ui.screens.home
 
 import android.content.Intent
 import android.provider.Settings
+import androidx.compose.animation.core.*
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -20,9 +22,16 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathOperation
+import androidx.compose.ui.graphics.StrokeCap
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -88,7 +97,7 @@ fun HomeScreen(
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = "Halo, Pengguna! ✨",
+                            text = "Ringkasan Finansial",
                             style = MaterialTheme.typography.labelSmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -524,13 +533,116 @@ fun AccountCard(
     }
 }
 
-private data class WeatherDisplayData(
-    val icon: String,
-    val condition: String,
-    val greeting: String,
-    val primaryColor: Color,
-    val secondaryColor: Color
-)
+@Composable
+fun AnimatedCelestialGraphic(
+    isDaytime: Boolean,
+    accentColor: Color,
+    modifier: Modifier = Modifier
+) {
+    val infiniteTransition = rememberInfiniteTransition(label = "celestial")
+
+    val rotation by infiniteTransition.animateFloat(
+        initialValue = 0f,
+        targetValue = 360f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 24000, easing = LinearEasing),
+            repeatMode = RepeatMode.Restart
+        ),
+        label = "rotation"
+    )
+
+    val pulse by infiniteTransition.animateFloat(
+        initialValue = 0.88f,
+        targetValue = 1.12f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(durationMillis = 2600, easing = FastOutSlowInEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "pulse"
+    )
+
+    Canvas(modifier = modifier) {
+        val center = Offset(size.width / 2f, size.height / 2f)
+        val baseRadius = size.minDimension / 4.4f
+
+        if (isDaytime) {
+            // Ambient outer soft glow
+            drawCircle(
+                color = accentColor.copy(alpha = 0.14f * pulse),
+                radius = baseRadius * 1.9f,
+                center = center
+            )
+            // Mid glow halo
+            drawCircle(
+                color = accentColor.copy(alpha = 0.22f),
+                radius = baseRadius * 1.35f,
+                center = center
+            )
+
+            // Rotating geometric sun rays
+            rotate(degrees = rotation, pivot = center) {
+                val rayCount = 8
+                val innerRayDist = baseRadius * 1.25f
+                val outerRayDist = baseRadius * 1.7f * pulse
+                for (i in 0 until rayCount) {
+                    val angleDeg = (i * 360f / rayCount)
+                    val angleRad = Math.toRadians(angleDeg.toDouble())
+                    val cosA = Math.cos(angleRad).toFloat()
+                    val sinA = Math.sin(angleRad).toFloat()
+
+                    val start = Offset(center.x + cosA * innerRayDist, center.y + sinA * innerRayDist)
+                    val end = Offset(center.x + cosA * outerRayDist, center.y + sinA * outerRayDist)
+
+                    drawLine(
+                        color = accentColor.copy(alpha = 0.85f),
+                        start = start,
+                        end = end,
+                        strokeWidth = 2.dp.toPx(),
+                        cap = StrokeCap.Round
+                    )
+                }
+            }
+
+            // Solid inner solar core
+            drawCircle(
+                color = accentColor,
+                radius = baseRadius,
+                center = center
+            )
+        } else {
+            // Nighttime: Glowing crescent moon & star sparkle
+            drawCircle(
+                color = accentColor.copy(alpha = 0.12f * pulse),
+                radius = baseRadius * 1.8f,
+                center = center
+            )
+
+            val moonPath = Path().apply {
+                val r = baseRadius * 1.1f
+                addOval(Rect(center.x - r, center.y - r, center.x + r, center.y + r))
+            }
+            val cutoutPath = Path().apply {
+                val r = baseRadius * 1.05f
+                val offsetCut = baseRadius * 0.55f
+                addOval(Rect(center.x - r + offsetCut, center.y - r - offsetCut * 0.35f, center.x + r + offsetCut, center.y + r - offsetCut * 0.35f))
+            }
+            val crescent = Path.combine(
+                PathOperation.Difference,
+                moonPath,
+                cutoutPath
+            )
+            drawPath(path = crescent, color = accentColor)
+
+            // Pulsing mini star
+            val starAlpha = ((pulse - 0.88f) / 0.24f).coerceIn(0.2f, 1f)
+            drawCircle(
+                color = accentColor.copy(alpha = starAlpha),
+                radius = 2.dp.toPx(),
+                center = Offset(center.x + baseRadius * 1.1f, center.y - baseRadius * 0.7f)
+            )
+        }
+    }
+}
 
 @Composable
 fun LiveClockWeatherCard(modifier: Modifier = Modifier) {
@@ -550,84 +662,105 @@ fun LiveClockWeatherCard(modifier: Modifier = Modifier) {
     val dayString = dayFormat.format(Date(currentTime))
     val timeString = timeFormat.format(Date(currentTime))
 
-    val weather = when (hour) {
-        in 5..10 -> WeatherDisplayData("🌅", "Pagi Cerah", "Selamat Pagi", Color(0xFFFF9800), Color(0xFFFFB74D))
-        in 11..14 -> WeatherDisplayData("☀️", "Siang Hangat", "Selamat Siang", Color(0xFF0091EA), Color(0xFFFFB300))
-        in 15..18 -> WeatherDisplayData("⛅", "Sore Teduh", "Selamat Sore", Color(0xFFFF7043), Color(0xFF7E57C2))
-        else -> WeatherDisplayData("🌙", "Malam Tenang", "Selamat Malam", Color(0xFF5C6BC0), Color(0xFF283593))
+    val isDaytime = hour in 5..18
+    val (greeting, accentColor) = when (hour) {
+        in 5..10 -> Pair("Selamat Pagi", ElectricLime)
+        in 11..14 -> Pair("Selamat Siang", Color(0xFFFFD54F))
+        in 15..18 -> Pair("Selamat Sore", Color(0xFFFFB74D))
+        else -> Pair("Selamat Malam", Color(0xFF80D8FF))
     }
+
+    val livePulse = rememberInfiniteTransition(label = "live_pulse")
+    val dotAlpha by livePulse.animateFloat(
+        initialValue = 0.3f,
+        targetValue = 1f,
+        animationSpec = infiniteRepeatable(
+            animation = tween(1200, easing = LinearEasing),
+            repeatMode = RepeatMode.Reverse
+        ),
+        label = "dot_alpha"
+    )
 
     Card(
         modifier = modifier
             .fillMaxWidth()
             .border(
-                width = 0.5.dp,
-                color = MaterialTheme.colorScheme.outline.copy(alpha = 0.25f),
-                shape = RoundedCornerShape(22.dp)
+                width = 0.8.dp,
+                color = DarkBorder,
+                shape = RoundedCornerShape(20.dp)
             ),
-        shape = RoundedCornerShape(22.dp),
+        shape = RoundedCornerShape(20.dp),
         colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.45f)
+            containerColor = Color(0xFF101216)
         )
     ) {
         Box(
             modifier = Modifier
                 .fillMaxWidth()
                 .background(
-                    Brush.horizontalGradient(
+                    Brush.verticalGradient(
                         colors = listOf(
-                            weather.primaryColor.copy(alpha = 0.16f),
-                            weather.secondaryColor.copy(alpha = 0.06f)
+                            Color(0xFF1A1D24).copy(alpha = 0.45f),
+                            Color(0xFF101216)
                         )
                     )
                 )
-                .padding(horizontal = 16.dp, vertical = 12.dp)
+                .padding(horizontal = 16.dp, vertical = 14.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Column {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(6.dp)
-                    ) {
-                        Text(text = weather.icon, fontSize = 20.sp)
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp)
+                ) {
+                    AnimatedCelestialGraphic(
+                        isDaytime = isDaytime,
+                        accentColor = accentColor,
+                        modifier = Modifier.size(38.dp)
+                    )
+
+                    Column {
                         Text(
-                            text = "${weather.greeting} • ${weather.condition}",
-                            style = MaterialTheme.typography.labelSmall,
+                            text = greeting,
+                            style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
-                            color = weather.primaryColor
+                            color = MaterialTheme.colorScheme.onSurface
+                        )
+                        Spacer(modifier = Modifier.height(2.dp))
+                        Text(
+                            text = dayString,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
                     }
-                    Spacer(modifier = Modifier.height(2.dp))
-                    Text(
-                        text = dayString,
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onSurface
-                    )
                 }
 
                 Surface(
-                    shape = RoundedCornerShape(12.dp),
-                    color = MaterialTheme.colorScheme.surface.copy(alpha = 0.9f),
-                    border = BorderStroke(1.dp, weather.primaryColor.copy(alpha = 0.35f)),
-                    shadowElevation = 2.dp
+                    shape = RoundedCornerShape(10.dp),
+                    color = Color(0xFF16181F),
+                    border = BorderStroke(0.8.dp, DarkBorder)
                 ) {
                     Row(
                         modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
                         verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Text(text = "⏱️", fontSize = 12.sp)
+                        Box(
+                            modifier = Modifier
+                                .size(6.dp)
+                                .clip(CircleShape)
+                                .background(accentColor.copy(alpha = dotAlpha))
+                        )
                         Text(
                             text = "$timeString WIB",
-                            style = MaterialTheme.typography.titleSmall,
-                            fontWeight = FontWeight.ExtraBold,
-                            letterSpacing = 1.sp,
-                            color = weather.primaryColor
+                            style = MaterialTheme.typography.labelSmall,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.Bold,
+                            letterSpacing = 0.5.sp,
+                            color = MaterialTheme.colorScheme.onSurface
                         )
                     }
                 }
