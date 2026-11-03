@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">SmartSpend</string>
+    <string name="notification_listener_label">SmartSpend Notification Reader</string>
+    <string name="widget_description">Lihat sisa budget dan pengeluaran harian SmartSpend secara sekilas.</string>
+    <string name="accessibility_service_label">SmartSpend Dynamic Island Overlay</string>
+    <string name="accessibility_service_desc">Memberikan izin overlay tingkat tinggi agar Dynamic Island dapat muncul di atas status bar kamera.</string>
+</resources>
