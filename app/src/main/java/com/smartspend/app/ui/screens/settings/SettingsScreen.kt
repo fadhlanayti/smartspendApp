@@ -524,7 +524,7 @@ fun SettingsScreen(
                                 } else if (devTapCount >= 7) {
                                     viewModel.setDevMode(true)
                                     devTapCount = 0
-                                    Toast.makeText(context, "🎉 Mode Pengembang Aktif!", Toast.LENGTH_LONG).show()
+                                    Toast.makeText(context, "Mode Pengembang Aktif", Toast.LENGTH_LONG).show()
                                 }
                             }
                         }
@@ -1148,6 +1148,11 @@ fun RuleTesterDialog(
     }
 }
 
+enum class RuleCreationMode {
+    AUTOMATIC_KEYWORD,
+    CUSTOM_REGEX
+}
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun EasyRuleTrainerSheet(
@@ -1188,12 +1193,17 @@ fun EasyRuleTrainerSheet(
     var customPackageName by remember { mutableStateOf(initialPackage ?: "") }
 
     var txType by remember { mutableStateOf("EXPENSE") }
+    var ruleMode by remember { mutableStateOf(RuleCreationMode.AUTOMATIC_KEYWORD) }
 
     val defaultExpenseKeywords = listOf("Transfer ke", "QRIS", "Pembayaran", "Transaksi Berhasil", "Bayar")
     val defaultIncomeKeywords = listOf("Transfer Masuk", "Terima Saldo", "Top Up", "Dana Masuk", "Menerima")
 
     var selectedKeyword by remember { mutableStateOf("Transfer ke") }
     var customKeyword by remember { mutableStateOf("") }
+    var customRegexPattern by remember {
+        mutableStateOf("""(?i).*?transfer\s+ke.*?rp\.?\s?(?<amt>[\d.,]+)(?:.*?(?:di|ke)\s+(?<mrc>[a-zA-Z0-9\s.]+?))?(?:\s+berhasil|\s+sukses|$)""")
+    }
+    var regexSyntaxError by remember { mutableStateOf<String?>(null) }
 
     var sampleText by remember { mutableStateOf(initialSampleText ?: "") }
     var testResult by remember { mutableStateOf<String?>(null) }
@@ -1203,32 +1213,50 @@ fun EasyRuleTrainerSheet(
         selectedKeyword = if (txType == "EXPENSE") defaultExpenseKeywords.first() else defaultIncomeKeywords.first()
     }
 
-    LaunchedEffect(sampleText, selectedApp, txType, selectedKeyword, customKeyword) {
+    // Compute effective pattern and run live test
+    LaunchedEffect(sampleText, selectedApp, txType, selectedKeyword, customKeyword, ruleMode, customRegexPattern) {
+        val effectivePattern = if (ruleMode == RuleCreationMode.AUTOMATIC_KEYWORD) {
+            val effectiveKeyword = customKeyword.trim().ifEmpty { selectedKeyword }
+            """(?i).*?${Regex.escape(effectiveKeyword)}.*?rp\.?\s?(?<amt>[\d.,]+)(?:.*?(?:di|ke|dari)\s+(?<mrc>[a-zA-Z0-9\s.]+?))?(?:\s+berhasil|\s+sukses|$)"""
+        } else {
+            customRegexPattern.trim()
+        }
+
+        // Validate regex syntax
+        try {
+            Regex(effectivePattern)
+            regexSyntaxError = null
+        } catch (e: Exception) {
+            regexSyntaxError = e.message ?: "Format regex tidak valid"
+            testResult = null
+            isTestSuccess = false
+            return@LaunchedEffect
+        }
+
         if (sampleText.isBlank()) {
             testResult = null
             isTestSuccess = false
             return@LaunchedEffect
         }
-        val effectiveKeyword = customKeyword.trim().ifEmpty { selectedKeyword }
-        val pattern = """(?i).*?${Regex.escape(effectiveKeyword)}.*?rp\.?\s?(?<amt>[\d.,]+)(?:.*?(?:di|ke|dari)\s+(?<mrc>[a-zA-Z0-9\s.]+?))?(?:\s+berhasil|\s+sukses|$)"""
+
         try {
-            val reg = Regex(pattern)
+            val reg = Regex(effectivePattern)
             val match = reg.find(sampleText)
             if (match != null) {
                 val rawAmt = match.groups["amt"]?.value ?: ""
                 val amt = AmountNormalizer.normalize(rawAmt) ?: 0L
                 val mrc = match.groups["mrc"]?.value?.trim() ?: "Umum"
-                testResult = "✓ Terdeteksi: Rp ${CurrencyFormatter.format(amt)} • $mrc (${if (txType == "EXPENSE") "Pengeluaran" else "Pemasukan"})"
+                testResult = "Pola cocok: Rp ${CurrencyFormatter.format(amt)} • $mrc (${if (txType == "EXPENSE") "Pengeluaran" else "Pemasukan"})"
                 isTestSuccess = true
             } else {
                 val fallbackMatch = Regex("""(?i)rp\.?\s?(?<amt>[\d.,]+)""").find(sampleText)
                 if (fallbackMatch != null) {
                     val rawAmt = fallbackMatch.groups["amt"]?.value ?: ""
                     val amt = AmountNormalizer.normalize(rawAmt) ?: 0L
-                    testResult = "⚠️ Nominal terdeteksi: Rp ${CurrencyFormatter.format(amt)}, tapi belum mengandung kata kunci \"$effectiveKeyword\""
+                    testResult = "Nominal terdeteksi Rp ${CurrencyFormatter.format(amt)}, namun belum cocok dengan kata kunci atau pola regex"
                     isTestSuccess = false
                 } else {
-                    testResult = "❌ Nominal nominal Rp tidak ditemukan dalam teks sampel"
+                    testResult = "Nominal Rp tidak ditemukan dalam teks sampel"
                     isTestSuccess = false
                 }
             }
@@ -1275,7 +1303,7 @@ fun EasyRuleTrainerSheet(
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "Ajari SmartSpend membaca notifikasi tanpa rumus",
+                        text = "Konfigurasi aturan pembacaan notifikasi bank dan e-wallet",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -1309,11 +1337,13 @@ fun EasyRuleTrainerSheet(
                     .horizontalScroll(rememberScrollState()),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                // Button to pick installed apps
                 FilterChip(
                     selected = false,
                     onClick = { showAppPickerDialog = true },
-                    label = { Text("📱 Semua App di HP...", fontSize = 12.sp, fontWeight = FontWeight.Bold) },
+                    label = { Text("Aplikasi di HP...", fontSize = 12.sp, fontWeight = FontWeight.Bold) },
+                    leadingIcon = {
+                        Icon(imageVector = Icons.Default.PhoneAndroid, contentDescription = null, modifier = Modifier.size(16.dp))
+                    },
                     colors = FilterChipDefaults.filterChipColors(
                         containerColor = AccentBlue.copy(alpha = 0.15f),
                         labelColor = AccentBlue
@@ -1353,7 +1383,7 @@ fun EasyRuleTrainerSheet(
                     OutlinedTextField(
                         value = customPackageName,
                         onValueChange = { customPackageName = it },
-                        label = { Text("Package Name (otomatis terisi bila pilih dari HP)") },
+                        label = { Text("Package Name") },
                         modifier = Modifier.fillMaxWidth(),
                         singleLine = true
                     )
@@ -1362,12 +1392,21 @@ fun EasyRuleTrainerSheet(
 
             // Quick Auto-fill from recent notifications
             if (rawEvents.isNotEmpty()) {
-                Text(
-                    text = "⚡ Notifikasi Terakhir Masuk di HP (Ketuk untuk otomatis isi):",
-                    style = MaterialTheme.typography.labelMedium,
-                    fontWeight = FontWeight.SemiBold,
-                    color = AccentBlue
-                )
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Icon(
+                        imageVector = Icons.Default.Notifications,
+                        contentDescription = null,
+                        tint = AccentBlue,
+                        modifier = Modifier.size(16.dp)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "Notifikasi Masuk Terakhir (Ketuk untuk isi otomatis):",
+                        style = MaterialTheme.typography.labelMedium,
+                        fontWeight = FontWeight.SemiBold,
+                        color = AccentBlue
+                    )
+                }
 
                 Row(
                     modifier = Modifier
@@ -1394,7 +1433,6 @@ fun EasyRuleTrainerSheet(
                                     customPackageName = event.packageName
                                     selectedApp = Triple(appLabel, "CUSTOM", event.packageName)
                                     sampleText = textContent
-                                    // Auto infer txType from keywords
                                     val lower = textContent.lowercase()
                                     if (lower.contains("masuk") || lower.contains("menerima") || lower.contains("top up") || lower.contains("terima")) {
                                         txType = "INCOME"
@@ -1518,49 +1556,130 @@ fun EasyRuleTrainerSheet(
                 }
             }
 
-            // Step 3: Kata Kunci Pemicu
+            // Step 3: Pilihan Mode Pembuatan Aturan (Kata Kunci Otomatis vs Pola Regex Manual)
             Text(
-                text = "3. Kata Kunci Pemicu Notifikasi",
+                text = "3. Metode Pembuatan Aturan",
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold
             )
 
-            val activeKeywords = if (txType == "EXPENSE") defaultExpenseKeywords else defaultIncomeKeywords
             Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .horizontalScroll(rememberScrollState()),
+                modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
-                activeKeywords.forEach { kw ->
-                    val isSelected = selectedKeyword == kw && customKeyword.isBlank()
-                    FilterChip(
-                        selected = isSelected,
-                        onClick = {
-                            selectedKeyword = kw
-                            customKeyword = ""
-                        },
-                        label = { Text(kw, fontSize = 12.sp) },
-                        colors = FilterChipDefaults.filterChipColors(
-                            selectedContainerColor = if (txType == "EXPENSE") ColorExpenseDark.copy(alpha = 0.2f) else ColorIncomeDark.copy(alpha = 0.2f),
-                            selectedLabelColor = if (txType == "EXPENSE") ColorExpenseDark else ColorIncomeDark
+                FilterChip(
+                    selected = ruleMode == RuleCreationMode.AUTOMATIC_KEYWORD,
+                    onClick = { ruleMode = RuleCreationMode.AUTOMATIC_KEYWORD },
+                    label = { Text("Pemicu Kata Kunci", fontSize = 12.sp) },
+                    leadingIcon = {
+                        Icon(imageVector = Icons.Default.AutoFixHigh, contentDescription = null, modifier = Modifier.size(16.dp))
+                    },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = AccentBlue.copy(alpha = 0.2f),
+                        selectedLabelColor = AccentBlue
+                    ),
+                    modifier = Modifier.weight(1f)
+                )
+
+                FilterChip(
+                    selected = ruleMode == RuleCreationMode.CUSTOM_REGEX,
+                    onClick = {
+                        val effectiveKeyword = customKeyword.trim().ifEmpty { selectedKeyword }
+                        customRegexPattern = """(?i).*?${Regex.escape(effectiveKeyword)}.*?rp\.?\s?(?<amt>[\d.,]+)(?:.*?(?:di|ke|dari)\s+(?<mrc>[a-zA-Z0-9\s.]+?))?(?:\s+berhasil|\s+sukses|$)"""
+                        ruleMode = RuleCreationMode.CUSTOM_REGEX
+                    },
+                    label = { Text("Pola Regex Kustom", fontSize = 12.sp) },
+                    leadingIcon = {
+                        Icon(imageVector = Icons.Default.Code, contentDescription = null, modifier = Modifier.size(16.dp))
+                    },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = AccentBlue.copy(alpha = 0.2f),
+                        selectedLabelColor = AccentBlue
+                    ),
+                    modifier = Modifier.weight(1f)
+                )
+            }
+
+            if (ruleMode == RuleCreationMode.AUTOMATIC_KEYWORD) {
+                // Mode 1: Kata Kunci
+                val activeKeywords = if (txType == "EXPENSE") defaultExpenseKeywords else defaultIncomeKeywords
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .horizontalScroll(rememberScrollState()),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    activeKeywords.forEach { kw ->
+                        val isSelected = selectedKeyword == kw && customKeyword.isBlank()
+                        FilterChip(
+                            selected = isSelected,
+                            onClick = {
+                                selectedKeyword = kw
+                                customKeyword = ""
+                            },
+                            label = { Text(kw, fontSize = 12.sp) },
+                            colors = FilterChipDefaults.filterChipColors(
+                                selectedContainerColor = if (txType == "EXPENSE") ColorExpenseDark.copy(alpha = 0.2f) else ColorIncomeDark.copy(alpha = 0.2f),
+                                selectedLabelColor = if (txType == "EXPENSE") ColorExpenseDark else ColorIncomeDark
+                            )
                         )
+                    }
+                }
+
+                OutlinedTextField(
+                    value = customKeyword,
+                    onValueChange = { customKeyword = it },
+                    label = { Text("Atau ketik kata kunci sendiri") },
+                    placeholder = { Text("misal: debit, potongan, transfer masuk") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+            } else {
+                // Mode 2: Custom Regex Manual
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = customRegexPattern,
+                        onValueChange = { customRegexPattern = it },
+                        label = { Text("Pola Regex Manual") },
+                        placeholder = { Text("""(?i)transfer\s+rp\.?\s?(?<amt>[\d.,]+)\s+ke\s+(?<mrc>.+?)\s+berhasil""") },
+                        maxLines = 4,
+                        isError = regexSyntaxError != null,
+                        supportingText = {
+                            if (regexSyntaxError != null) {
+                                Text(regexSyntaxError!!, color = ColorExpenseDark)
+                            } else {
+                                Text("Gunakan nama grup (?<amt>...) untuk nominal dan (?<mrc>...) untuk merchant", fontSize = 10.sp)
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
                     )
+
+                    // Helper chips to easily append named groups
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .horizontalScroll(rememberScrollState()),
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        SuggestionChip(
+                            onClick = { customRegexPattern += """(?<amt>[\d.,]+)""" },
+                            label = { Text("+ Nominal (?<amt>)", fontSize = 11.sp) }
+                        )
+                        SuggestionChip(
+                            onClick = { customRegexPattern += """(?<mrc>.+?)""" },
+                            label = { Text("+ Merchant (?<mrc>)", fontSize = 11.sp) }
+                        )
+                        SuggestionChip(
+                            onClick = { if (!customRegexPattern.startsWith("(?i)")) customRegexPattern = "(?i)$customRegexPattern" },
+                            label = { Text("+ Case-Insensitive (?i)", fontSize = 11.sp) }
+                        )
+                    }
                 }
             }
 
-            OutlinedTextField(
-                value = customKeyword,
-                onValueChange = { customKeyword = it },
-                label = { Text("Atau ketik kata kunci sendiri") },
-                placeholder = { Text("misal: debit, potongan, transfer masuk") },
-                singleLine = true,
-                modifier = Modifier.fillMaxWidth()
-            )
-
             // Step 4: Kotak Tes / Tempel Notifikasi
             Text(
-                text = "4. Uji Coba (Tempel Contoh Notifikasi Bank)",
+                text = "4. Uji Coba Pola Notifikasi",
                 style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.SemiBold
             )
@@ -1589,12 +1708,21 @@ fun EasyRuleTrainerSheet(
                         )
                         .padding(12.dp)
                 ) {
-                    Text(
-                        text = res,
-                        style = MaterialTheme.typography.bodySmall,
-                        fontWeight = if (isTestSuccess) FontWeight.SemiBold else FontWeight.Normal,
-                        color = if (isTestSuccess) ColorIncomeDark else MaterialTheme.colorScheme.onSurface
-                    )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(
+                            imageVector = if (isTestSuccess) Icons.Default.CheckCircle else Icons.Default.Info,
+                            contentDescription = null,
+                            tint = if (isTestSuccess) ColorIncomeDark else MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.size(18.dp)
+                        )
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = res,
+                            style = MaterialTheme.typography.bodySmall,
+                            fontWeight = if (isTestSuccess) FontWeight.SemiBold else FontWeight.Normal,
+                            color = if (isTestSuccess) ColorIncomeDark else MaterialTheme.colorScheme.onSurface
+                        )
+                    }
                 }
             }
 
@@ -1604,20 +1732,25 @@ fun EasyRuleTrainerSheet(
             val effectiveProvider = if (selectedApp.second == "CUSTOM") "CUSTOM" else selectedApp.second
             val effectiveKeyword = customKeyword.trim().ifEmpty { selectedKeyword }
 
-            val canSave = effectivePkg.isNotBlank() && effectiveKeyword.isNotBlank()
+            val effectivePattern = if (ruleMode == RuleCreationMode.AUTOMATIC_KEYWORD) {
+                """(?i).*?${Regex.escape(effectiveKeyword)}.*?rp\.?\s?(?<amt>[\d.,]+)(?:.*?(?:di|ke|dari)\s+(?<mrc>[a-zA-Z0-9\s.]+?))?(?:\s+berhasil|\s+sukses|$)"""
+            } else {
+                customRegexPattern.trim()
+            }
+
+            val canSave = effectivePkg.isNotBlank() && effectivePattern.isNotBlank() && regexSyntaxError == null
 
             Button(
                 onClick = {
-                    val pattern = """(?i).*?${Regex.escape(effectiveKeyword)}.*?rp\.?\s?(?<amt>[\d.,]+)(?:.*?(?:di|ke|dari)\s+(?<mrc>[a-zA-Z0-9\s.]+?))?(?:\s+berhasil|\s+sukses|$)"""
-                    val ruleName = "$effectiveAppName - ${if (txType == "EXPENSE") "Pengeluaran" else "Pemasukan"} ($effectiveKeyword)"
+                    val ruleName = "$effectiveAppName - ${if (txType == "EXPENSE") "Pengeluaran" else "Pemasukan"} (${if (ruleMode == RuleCreationMode.AUTOMATIC_KEYWORD) effectiveKeyword else "Regex Kustom"})"
                     viewModel.addCustomRule(
                         providerCode = effectiveProvider,
                         packageName = effectivePkg,
                         ruleName = ruleName,
-                        pattern = pattern,
+                        pattern = effectivePattern,
                         txType = txType
                     )
-                    Toast.makeText(context, "Aturan untuk $effectiveAppName berhasil disimpan dan aktif!", Toast.LENGTH_SHORT).show()
+                    Toast.makeText(context, "Aturan untuk $effectiveAppName berhasil disimpan dan aktif", Toast.LENGTH_SHORT).show()
                     onDismiss()
                 },
                 enabled = canSave,
@@ -2316,7 +2449,7 @@ fun SendDebtReminderDialog(
                 shape = RoundedCornerShape(12.dp),
                 colors = ButtonDefaults.buttonColors(containerColor = ColorIncomeDark)
             ) {
-                Text("💬 Kirim via WhatsApp", color = Color.White)
+                Text("Kirim via WhatsApp", color = Color.White)
             }
 
             OutlinedButton(
@@ -2331,7 +2464,7 @@ fun SendDebtReminderDialog(
                 modifier = Modifier.fillMaxWidth(),
                 shape = RoundedCornerShape(12.dp)
             ) {
-                Text("📤 Bagikan / SMS")
+                Text("Bagikan / SMS")
             }
         }
     }
