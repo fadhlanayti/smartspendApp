@@ -59,8 +59,9 @@ object SystemIslandOverlayManager {
     private const val TOP_GAP_DP = 8
     private const val CAMERA_CUTOUT_WIDTH_DP = 42
     private const val COMPACT_WIDTH_DP = 142
-    private const val COMPACT_HEIGHT_DP = 38
-    private const val COMPACT_CORNER_RADIUS_DP = 19
+    private const val COMPACT_HEIGHT_DP = 40
+    private const val COMPACT_CORNER_RADIUS_DP = 20
+    private const val COMPACT_WINDOW_HEIGHT_DP = 56
 
     // Compact tight expanded card: 160dp height with slim margins
     private const val EXPANDED_WIDTH_DP = 330
@@ -113,29 +114,36 @@ object SystemIslandOverlayManager {
             activeLoadJob?.cancel()
             dismissAlertRunnable?.let { mainHandler.removeCallbacks(it) }
             autoCollapseRunnable?.let { mainHandler.removeCallbacks(it) }
-            currentAnimator?.cancel()
+            currentAnimator?.let {
+                it.removeAllListeners()
+                it.cancel()
+            }
+            currentAnimator = null
 
             overlayRoot?.setBackgroundColor(Color.TRANSPARENT)
             overlayRoot?.isClickable = false
             overlayRoot?.setOnClickListener(null)
 
             islandCard?.let { card ->
+                while (card.childCount > 1) {
+                    card.removeViewAt(0)
+                }
                 val p = (card.layoutParams as? FrameLayout.LayoutParams) ?: FrameLayout.LayoutParams(
-                    FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT
+                    dpToPx(context, COMPACT_WIDTH_DP), dpToPx(context, COMPACT_HEIGHT_DP)
                 )
-                p.width = FrameLayout.LayoutParams.MATCH_PARENT
-                p.height = FrameLayout.LayoutParams.MATCH_PARENT
-                p.topMargin = 0
-                p.gravity = Gravity.CENTER
+                p.width = dpToPx(context, COMPACT_WIDTH_DP)
+                p.height = dpToPx(context, COMPACT_HEIGHT_DP)
+                p.topMargin = dpToPx(context, TOP_GAP_DP)
+                p.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
                 card.layoutParams = p
             }
 
             windowLayoutParams?.let { lp ->
                 lp.width = dpToPx(context, COMPACT_WIDTH_DP)
-                lp.height = dpToPx(context, COMPACT_HEIGHT_DP)
+                lp.height = dpToPx(context, TOP_GAP_DP + COMPACT_WINDOW_HEIGHT_DP)
                 lp.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
                 lp.x = 0
-                lp.y = dpToPx(context, TOP_GAP_DP)
+                lp.y = 0
                 lp.flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                         WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
                         WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
@@ -190,26 +198,33 @@ object SystemIslandOverlayManager {
                 overlayRoot?.setOnClickListener(null)
                 dismissAlertRunnable?.let { mainHandler.removeCallbacks(it) }
                 autoCollapseRunnable?.let { mainHandler.removeCallbacks(it) }
-                currentAnimator?.cancel()
+                currentAnimator?.let {
+                    it.removeAllListeners()
+                    it.cancel()
+                }
+                currentAnimator = null
 
                 if (currentMode == IslandMode.EXPANDED) {
                     currentMode = IslandMode.COMPACT
                     islandCard?.let { card ->
+                        while (card.childCount > 1) {
+                            card.removeViewAt(0)
+                        }
                         val p = (card.layoutParams as? FrameLayout.LayoutParams) ?: FrameLayout.LayoutParams(
-                            FrameLayout.LayoutParams.MATCH_PARENT, FrameLayout.LayoutParams.MATCH_PARENT
+                            dpToPx(context, COMPACT_WIDTH_DP), dpToPx(context, COMPACT_HEIGHT_DP)
                         )
-                        p.width = FrameLayout.LayoutParams.MATCH_PARENT
-                        p.height = FrameLayout.LayoutParams.MATCH_PARENT
-                        p.topMargin = 0
-                        p.gravity = Gravity.CENTER
+                        p.width = dpToPx(context, COMPACT_WIDTH_DP)
+                        p.height = dpToPx(context, COMPACT_HEIGHT_DP)
+                        p.topMargin = dpToPx(context, TOP_GAP_DP)
+                        p.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
                         card.layoutParams = p
                     }
                     windowLayoutParams?.let { lp ->
                         lp.width = dpToPx(context, COMPACT_WIDTH_DP)
-                        lp.height = dpToPx(context, COMPACT_HEIGHT_DP)
+                        lp.height = dpToPx(context, TOP_GAP_DP + COMPACT_WINDOW_HEIGHT_DP)
                         lp.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
                         lp.x = 0
-                        lp.y = dpToPx(context, TOP_GAP_DP)
+                        lp.y = 0
                         lp.flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                                 WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
                                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
@@ -230,8 +245,9 @@ object SystemIslandOverlayManager {
             WidgetStateStore.getSnapshotFlow(appContext).collect { snapshot ->
                 lastSnapshot = snapshot
                 mainHandler.post {
-                    if (isAppForeground || !isVisibleState) return@post
+                    if (isAppForeground || !isVisibleState || isTemporarilyHidden) return@post
                     val card = islandCard ?: return@post
+                    if (currentAnimator?.isRunning == true) return@post
                     if (currentMode == IslandMode.COMPACT) {
                         card.removeAllViews()
                         card.addView(buildCompactView(appContext, snapshot))
@@ -252,8 +268,9 @@ object SystemIslandOverlayManager {
     fun onSnapshotUpdated(context: Context, snapshot: WidgetSnapshot) {
         lastSnapshot = snapshot
         mainHandler.post {
-            if (isAppForeground || !isVisibleState) return@post
+            if (isAppForeground || !isVisibleState || isTemporarilyHidden) return@post
             val card = islandCard ?: return@post
+            if (currentAnimator?.isRunning == true) return@post
             if (currentMode == IslandMode.COMPACT) {
                 card.removeAllViews()
                 card.addView(buildCompactView(context.applicationContext, snapshot))
@@ -329,18 +346,17 @@ object SystemIslandOverlayManager {
         val appContext = context.applicationContext
         if (isAppForeground || !isVisibleState || !canDrawOverlays(appContext) || isTemporarilyHidden) return
 
-        activeLoadJob?.cancel()
-        activeLoadJob = scope.launch {
-            val snapshot = runCatching {
-                WidgetStateStore.getSnapshotFlow(appContext).first()
-            }.getOrDefault(WidgetSnapshot())
-            lastSnapshot = snapshot
-
-            mainHandler.post {
-                if (isAppForeground || !isVisibleState || isTemporarilyHidden) return@post
-                transitionToMode(appContext, IslandMode.COMPACT)
+        if (currentMode == IslandMode.COMPACT) {
+            val card = islandCard ?: return
+            if (currentAnimator?.isRunning != true && card.childCount != 1) {
+                card.removeAllViews()
+                card.addView(buildCompactView(appContext, lastSnapshot))
             }
+            return
         }
+
+        activeLoadJob?.cancel()
+        transitionToMode(appContext, IslandMode.COMPACT)
     }
 
     private fun getStatusBarHeight(context: Context): Int {
@@ -354,17 +370,27 @@ object SystemIslandOverlayManager {
         Log.i("SmartSpendIsland", "expand() called: isAppFg=$isAppForeground, isVis=$isVisibleState, canDraw=${canDrawOverlays(appContext)}, isHidden=$isTemporarilyHidden, mode=$currentMode")
         if (isAppForeground || !isVisibleState || !canDrawOverlays(appContext) || isTemporarilyHidden || currentMode == IslandMode.EXPANDED) return
 
+        dismissAlertRunnable?.let { mainHandler.removeCallbacks(it) }
         activeLoadJob?.cancel()
+
+        // 1. Instant spring expansion with cached snapshot - zero touch latency
+        transitionToMode(appContext, IslandMode.EXPANDED)
+
+        // 2. Refresh snapshot asynchronously in background if fresh data is needed
         activeLoadJob = scope.launch {
             val snapshot = runCatching {
                 WidgetStateStore.getSnapshotFlow(appContext).first()
-            }.getOrDefault(WidgetSnapshot())
-            lastSnapshot = snapshot
-
-            mainHandler.post {
-                if (isAppForeground || !isVisibleState || isTemporarilyHidden || currentMode == IslandMode.EXPANDED) return@post
-                dismissAlertRunnable?.let { mainHandler.removeCallbacks(it) }
-                transitionToMode(appContext, IslandMode.EXPANDED)
+            }.getOrNull()
+            if (snapshot != null && snapshot != lastSnapshot) {
+                lastSnapshot = snapshot
+                withContext(Dispatchers.Main) {
+                    if (currentMode == IslandMode.EXPANDED && currentAnimator?.isRunning != true) {
+                        islandCard?.let { card ->
+                            card.removeAllViews()
+                            card.addView(buildExpandedView(appContext, snapshot))
+                        }
+                    }
+                }
             }
         }
     }
@@ -428,6 +454,10 @@ object SystemIslandOverlayManager {
             background = cardBackground
             isClickable = true
             isFocusable = false
+            clipChildren = true
+            if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.LOLLIPOP) {
+                clipToOutline = true
+            }
 
             setOnTouchListener { _, event ->
                 if (currentMode != IslandMode.EXPANDED) return@setOnTouchListener false
@@ -466,22 +496,29 @@ object SystemIslandOverlayManager {
                 return super.dispatchTouchEvent(ev)
             }
         }.apply {
-            isClickable = false
+            isClickable = true
             isFocusable = false
+            setOnClickListener {
+                if (currentMode == IslandMode.COMPACT) {
+                    expand(context)
+                }
+            }
             visibility = View.VISIBLE
             addView(
                 islandCard,
                 FrameLayout.LayoutParams(
-                    FrameLayout.LayoutParams.MATCH_PARENT,
-                    FrameLayout.LayoutParams.MATCH_PARENT,
-                    Gravity.CENTER
-                )
+                    dpToPx(context, COMPACT_WIDTH_DP),
+                    dpToPx(context, COMPACT_HEIGHT_DP),
+                    Gravity.TOP or Gravity.CENTER_HORIZONTAL
+                ).apply {
+                    topMargin = dpToPx(context, TOP_GAP_DP)
+                }
             )
         }
 
         windowLayoutParams = WindowManager.LayoutParams(
             dpToPx(context, COMPACT_WIDTH_DP),
-            dpToPx(context, COMPACT_HEIGHT_DP),
+            dpToPx(context, TOP_GAP_DP + COMPACT_WINDOW_HEIGHT_DP),
             windowType,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                     WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
@@ -490,7 +527,8 @@ object SystemIslandOverlayManager {
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
-            y = dpToPx(context, TOP_GAP_DP)
+            x = 0
+            y = 0
             if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.P) {
                 layoutInDisplayCutoutMode = WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
             }
@@ -540,6 +578,19 @@ object SystemIslandOverlayManager {
         currentMode = targetMode
         Log.i("SmartSpendIsland", "transitionToMode: from $fromMode to $targetMode")
 
+        // Cancel running animator first without firing old callbacks
+        currentAnimator?.let {
+            it.removeAllListeners()
+            it.cancel()
+        }
+        currentAnimator = null
+
+        // Prune any dangling child views before adding newView
+        while (card.childCount > 1) {
+            card.removeViewAt(0)
+        }
+        val oldView = if (card.childCount > 0) card.getChildAt(0) else null
+
         if (targetMode == IslandMode.EXPANDED) {
             resetAutoCollapseTimer(context)
         } else {
@@ -559,8 +610,8 @@ object SystemIslandOverlayManager {
             IslandMode.EXPANDED -> Triple(EXPANDED_WIDTH_DP, EXPANDED_HEIGHT_DP, EXPANDED_CORNER_RADIUS_DP)
         }
 
-        val startW = if (fromMode == IslandMode.EXPANDED) dpToPx(context, EXPANDED_WIDTH_DP) else lp.width
-        val startH = if (fromMode == IslandMode.EXPANDED) dpToPx(context, EXPANDED_HEIGHT_DP) else lp.height
+        val startW = if (fromMode == IslandMode.EXPANDED) dpToPx(context, EXPANDED_WIDTH_DP) else card.width.let { if (it > 0) it else dpToPx(context, COMPACT_WIDTH_DP) }
+        val startH = if (fromMode == IslandMode.EXPANDED) dpToPx(context, EXPANDED_HEIGHT_DP) else card.height.let { if (it > 0) it else dpToPx(context, COMPACT_HEIGHT_DP) }
         val targetW = dpToPx(context, targetWidthDp)
         val targetH = dpToPx(context, targetHeightDp)
 
@@ -578,7 +629,7 @@ object SystemIslandOverlayManager {
             // Expand window to fullscreen to intercept touches outside the modal
             lp.width = WindowManager.LayoutParams.MATCH_PARENT
             lp.height = WindowManager.LayoutParams.MATCH_PARENT
-            lp.gravity = Gravity.TOP or Gravity.START
+            lp.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
             lp.x = 0
             lp.y = 0
             lp.flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
@@ -615,8 +666,6 @@ object SystemIslandOverlayManager {
             IslandMode.EXPANDED -> buildExpandedView(context, lastSnapshot)
         }
 
-        val oldView = if (card.childCount > 0) card.getChildAt(0) else null
-
         // Prepare new view for entrance
         newView.alpha = 0f
         if (targetMode == IslandMode.EXPANDED) {
@@ -624,10 +673,53 @@ object SystemIslandOverlayManager {
         }
         card.addView(newView)
 
-        currentAnimator?.cancel()
         val isExpanding = targetMode == IslandMode.EXPANDED
         val animDuration = if (isExpanding) 320L else 260L
         val interpolator = if (isExpanding) appleSpringEnter else appleSpringExit
+
+        fun finishTransition() {
+            // Strictly guarantee ONLY newView remains in card
+            while (card.childCount > 1) {
+                if (card.getChildAt(0) != newView) {
+                    card.removeViewAt(0)
+                } else {
+                    card.removeViewAt(1)
+                }
+            }
+            newView.alpha = 1f
+            newView.translationY = 0f
+
+            if (isExitingExpanded) {
+                root.setBackgroundColor(Color.TRANSPARENT)
+                root.isClickable = true
+                root.setOnClickListener {
+                    if (currentMode == IslandMode.COMPACT) {
+                        expand(context)
+                    }
+                }
+
+                val p = card.layoutParams as FrameLayout.LayoutParams
+                p.width = dpToPx(context, COMPACT_WIDTH_DP)
+                p.height = dpToPx(context, COMPACT_HEIGHT_DP)
+                p.topMargin = dpToPx(context, TOP_GAP_DP)
+                p.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+                card.layoutParams = p
+
+                lp.width = dpToPx(context, COMPACT_WIDTH_DP)
+                lp.height = dpToPx(context, TOP_GAP_DP + COMPACT_WINDOW_HEIGHT_DP)
+                lp.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+                lp.x = 0
+                lp.y = 0
+                lp.flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
+                        WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
+                        WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
+                        WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
+                try {
+                    wm.updateViewLayout(root, lp)
+                } catch (_: Exception) {}
+            }
+            currentAnimator = null
+        }
 
         val animator = ValueAnimator.ofFloat(0f, 1f).apply {
             duration = animDuration
@@ -644,6 +736,7 @@ object SystemIslandOverlayManager {
                     p.width = curW
                     p.height = curH
                     p.topMargin = curTop
+                    p.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
                     card.layoutParams = p
 
                     val scrimAlpha = if (isEnteringExpanded) (0x44 * f).toInt() else (0x44 * (1f - f)).toInt()
@@ -658,44 +751,26 @@ object SystemIslandOverlayManager {
 
                 bg.cornerRadius = curR
 
-                oldView?.alpha = (1f - (f * 2.2f).coerceAtMost(1f))
-                newView.alpha = ((f - 0.2f) * 1.25f).coerceIn(0f, 1f)
-
                 if (isExpanding) {
+                    oldView?.alpha = (1f - (f * 2.2f).coerceAtMost(1f))
+                    newView.alpha = ((f - 0.2f) * 1.25f).coerceIn(0f, 1f)
                     newView.translationY = -dpToPx(context, 12) * (1f - f)
+                } else {
+                    val oldAlpha = (1f - (f * 4f)).coerceIn(0f, 1f)
+                    oldView?.alpha = oldAlpha
+                    if (oldAlpha <= 0f && oldView?.visibility != View.GONE) {
+                        oldView?.visibility = View.GONE
+                    }
+                    newView.alpha = ((f - 0.5f) * 2f).coerceIn(0f, 1f)
                 }
             }
             addListener(object : AnimatorListenerAdapter() {
                 override fun onAnimationEnd(animation: Animator) {
-                    oldView?.let { card.removeView(it) }
-                    newView.alpha = 1f
-                    newView.translationY = 0f
+                    finishTransition()
+                }
 
-                    if (isExitingExpanded) {
-                        root.setBackgroundColor(Color.TRANSPARENT)
-                        root.isClickable = false
-                        root.setOnClickListener(null)
-
-                        val p = card.layoutParams as FrameLayout.LayoutParams
-                        p.width = FrameLayout.LayoutParams.MATCH_PARENT
-                        p.height = FrameLayout.LayoutParams.MATCH_PARENT
-                        p.topMargin = 0
-                        p.gravity = Gravity.CENTER
-                        card.layoutParams = p
-
-                        lp.width = dpToPx(context, COMPACT_WIDTH_DP)
-                        lp.height = dpToPx(context, COMPACT_HEIGHT_DP)
-                        lp.gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
-                        lp.x = 0
-                        lp.y = dpToPx(context, TOP_GAP_DP)
-                        lp.flags = WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                                WindowManager.LayoutParams.FLAG_NOT_TOUCH_MODAL or
-                                WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
-                                WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
-                        try {
-                            wm.updateViewLayout(root, lp)
-                        } catch (_: Exception) {}
-                    }
+                override fun onAnimationCancel(animation: Animator) {
+                    finishTransition()
                 }
             })
         }
